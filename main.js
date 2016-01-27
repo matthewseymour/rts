@@ -33,8 +33,8 @@ function setPixelValue(array, x, y, width, color) {
 var spriteProgramInfo = (function () {
     var programInfo = glUtils.makeProgram(
         gl, spriteVertexSource, spriteFragmentSource, 
-        ["a_position", "a_texCoord", "u_resolution", "u_position", "u_size", "u_texResolution", "u_texPosition", "u_texSize"], 
-        ["u_image", "u_mask"]
+        ["a_position", "a_texCoord"], 
+        ["u_image", "u_mask", "u_resolution", "u_position", "u_size", "u_texResolution", "u_texPosition", "u_texSize"]
     );
     
 	//set resolution:

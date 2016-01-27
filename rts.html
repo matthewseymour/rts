@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<style type="text/css">
+	html,body { background:#fff; height:100%; margin:0; padding:0; overflow:hidden; background-color: #000000 }
+	canvas { position:absolute; top:0; left:0 }
+	#head { top:0; bottom:0px; }
+	#foot { top:0; bottom:0; }
+</style>
+<body>
+<canvas id="canvas">Get a better browser</canvas>
+
+<script id="2d-vertex-shader" type="x-shader/x-vertex">
+attribute vec2 a_position;
+attribute vec2 a_texCoord;
+
+uniform vec2 u_resolution;
+uniform vec2 u_position, u_size;
+
+varying vec2 v_texCoord;
+uniform vec2 u_texResolution;
+uniform vec2 u_texPosition, u_texSize;
+
+void main() {
+	//convert from 0,0->1,1 to pixel positions:
+	vec2 pixel_pos = a_position * u_size + u_position; 
+
+	//convert the rectangle from pixels to 0.0 to 1.0
+	vec2 zeroToOne = pixel_pos / u_resolution;
+	
+	//convert from 0 -> 1 to -1 -> 1, also flip y
+	gl_Position = vec4((zeroToOne * 2.0 - 1.0), 0, 1);
+	
+	//convert from 0,0->1,1 to pixel positions:
+	vec2 texPixelPos = a_texCoord * u_texSize + u_texPosition; 
+
+	//convert the rectangle from pixels to 0.0 to 1.0
+	v_texCoord = texPixelPos / u_texResolution;
+}
+</script>
+<script id="2d-fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+
+uniform sampler2D u_image;
+uniform vec4 u_mask;
+
+varying vec2 v_texCoord;
+
+void main() {
+	gl_FragColor = texture2D(u_image, v_texCoord) * u_mask;
+}
+</script>
+
+
+
+
+
+<script src=shader-include-packData.js    type="text/javascript"></script>
+
+<script src=shader-vertex.js                  type="text/javascript"></script>
+<script src=shader-vertex-sprite.js           type="text/javascript"></script>
+<script src=shader-vertex-spriteMask.js       type="text/javascript"></script>
+
+<script src=shader-fragment-sprite.js         type="text/javascript"></script>
+<script src=shader-fragment-spriteMask.js     type="text/javascript"></script>
+<script src=shader-fragment-transpose.js      type="text/javascript"></script>
+<script src=shader-fragment-scale.js          type="text/javascript"></script>
+<script src=shader-fragment-stage.js          type="text/javascript"></script>
+<script src=shader-fragment-bitReverse.js     type="text/javascript"></script>
+<script src=shader-fragment-transform.js      type="text/javascript"></script>
+<script src=shader-fragment-colorMap.js       type="text/javascript"></script>
+<script src=shader-fragment-bicubic.js        type="text/javascript"></script>
+<script src=shader-fragment-grad.js           type="text/javascript"></script>
+<script src=shader-fragment-noise.js          type="text/javascript"></script>
+<script src=shader-fragment-gaussian-noise.js type="text/javascript"></script>
+<script src=shader-fragment-transform-2.js    type="text/javascript"></script>
+
+<script src=webgl-utils.js type="text/javascript"></script>
+<script src=my-gl-utils.js type="text/javascript"></script>
+<script src=fft.js type="text/javascript"></script>
+<script src=main.js type="text/javascript"></script>
+
+
+</body>
+</html> 
+

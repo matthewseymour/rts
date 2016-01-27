@@ -30,6 +30,23 @@ function setPixelValue(array, x, y, width, color) {
     array[(y * width + x) * 4 + 3] = color[3];
 }
 
+var primitiveProgramInfo = (function () {
+    var programInfo = glUtils.makeProgram(
+        gl, primitiveVertexSource, primitiveFragmentSource, 
+        ["a_position"], 
+        ["u_resolution", "u_position", "u_size", "u_color"]
+    );
+    
+	//set resolution:
+	gl.useProgram(programInfo.program);
+    programInfo.setters.u_resolution([canvas.width, canvas.height]);
+    
+    programInfo.vertexBuffer = glUtils.generateSimpleUnitRectangleBuffer(gl);
+    
+	
+    return programInfo;
+})();
+
 var spriteProgramInfo = (function () {
     var programInfo = glUtils.makeProgram(
         gl, spriteVertexSource, spriteFragmentSource, 
@@ -70,6 +87,23 @@ var fftProgs = fft.getPrograms(gl);
 function makeSpriteData(data, width, height) {
     return glUtils.makeTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, data);
 }
+
+function drawBox(gl, x, y, w, h, color) {
+	gl.useProgram(primitiveProgramInfo.program);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, primitiveProgramInfo.vertexBuffer);
+	gl.vertexAttribPointer(primitiveProgramInfo.attribsUniforms.a_position, 2, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(primitiveProgramInfo.attribsUniforms.a_position);
+
+	primitiveProgramInfo.setters.u_position([x, y]);
+	primitiveProgramInfo.setters.u_size([w, h]);
+	primitiveProgramInfo.setters.u_color(color);
+	
+	//draw
+	gl.drawArrays(gl.TRIANGLES, 0, 6);
+	
+}
+
 
 function drawSprite(gl, sx, sy, sw, sh, x, y, w, h, sprite, mask) {
 	gl.useProgram(spriteProgramInfo.program);
@@ -419,6 +453,9 @@ function drawWaveBuff(timestamp) {
         map.landMaskBuffer, 
         waveBuff.waveTextures[t]
     );
+    
+    drawBox(gl, 30, 40, 50, 60, [1, 0, 0, .5]);
+    
     requestAnimationFrame(drawWaveBuff);
 }
 

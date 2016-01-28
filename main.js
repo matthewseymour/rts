@@ -425,7 +425,7 @@ var waveBuff = getWaveBuffer(fft, 512, 60);
 
 
 var startTime = null;
-function drawWaveBuff(timestamp) {
+function frame(timestamp) {
     if (!startTime) 
         startTime = timestamp;
     
@@ -456,8 +456,7 @@ function drawWaveBuff(timestamp) {
     
     drawBox(gl, 30, 40, 50, 60, [1, 0, 0, .5]);
     
-    requestAnimationFrame(drawWaveBuff);
+    requestAnimationFrame(frame);
 }
 
-requestAnimationFrame(drawWaveBuff);
-//setInterval(drawWaveBuff, 1000 / 30);
+requestAnimationFrame(frame);

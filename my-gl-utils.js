@@ -1,3 +1,5 @@
+"use strict";
+
 var glUtils = {};
 
 glUtils.generateSimpleUnitRectangleBuffer = function(gl) {

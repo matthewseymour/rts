@@ -165,7 +165,6 @@ function generateHeightMap(fft, stages, scale) {
     var buffer3 = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
 
 
-    //fft.noise(gl, fftProgs, Math.floor(Math.random() * 65535), buffer1);
     fft.gaussianNoise(gl, fftProgs, Math.floor(Math.random() * 65535), 1, buffer1);
 
     var shapeNoise = fft.buildCustomProgram(gl, `
@@ -189,274 +188,62 @@ function generateHeightMap(fft, stages, scale) {
     fft.scale(gl, fftProgs, scale, buffer1, buffer2);
     
     return {heightMapBuffer: buffer2 };
-    
-    
 }
 
 
 
 
-var grassNoiseThreshold = 100;
-
-function getMapBackgroundGrass(value) {
-    var noiseThreshold = grassNoiseThreshold;
-    var land;
-    var water;
-    var landMask;
-    
-	
-	if(value < noiseThreshold + 5) //Land
-	{
-		var tempValue = value - noiseThreshold;
-        land = [Math.max(0, Math.round(tempValue * 300 / (255 - noiseThreshold)) + 75),
-				Math.max(0, Math.round(tempValue * 300 / (255 - noiseThreshold)) + 75),
-				0,
-                255];
-    }               
-	else
-	{
-		var tempValue = value - noiseThreshold;
-		land = [Math.round(tempValue * 45 / (255 - noiseThreshold)) + 80,
-				Math.round(tempValue * 45 / (255 - noiseThreshold)) + 130,
-				Math.round(tempValue * 25 / (255 - noiseThreshold)) + 40,
-                255];
-	}
-    if(value < noiseThreshold) 
-    {
-        water = [Math.round(value *  45 / noiseThreshold) +  0,
-    			 Math.round(value *  75 / noiseThreshold) + 75,
-    			 Math.round(value *  85 / noiseThreshold) + 85,
-                 255];
-    } 
-    else 
-    {
-        water = [0,0,0,0];
-    }
-    
-	if(value < noiseThreshold) 
-    {
-        var mask = Math.floor(255 * value / noiseThreshold);
-		landMask = [255, 255, 255, 255 - mask];
-	} 
-    else 
-    {
-		landMask = [0, 0, 0, 0];
-    }
-    
-    
-    
-    return {land: land, water: water, landMask: landMask};
-}
-
-
-
-var upscale = {x: 8, y: 6};
-
-function genMap(fft, size) {
-    
-    //Next power of 2 to incorporate the map size:
-    var stages = Math.ceil(Math.log(size) / Math.log(2));
-    var N = 1 << stages; //the resized size
-
-    var heightMap = generateHeightMap(fft, stages, 15);
-
-
-
-    var colorMapSize = 255;
-    var colorMapLandPixels     = new Uint8Array(colorMapSize * 3 * 4);
-    var colorMapWaterPixels    = new Uint8Array(colorMapSize * 3 * 4);
-    var colorMapLandMaskPixels = new Uint8Array(colorMapSize * 3 * 4);
-    
-    for(var i = 0; i < colorMapSize; i++) {
-        var colorValues = getMapBackgroundGrass(i);
-        setPixelValue(colorMapLandPixels, i, 0, colorMapSize, colorValues.land);
-        setPixelValue(colorMapLandPixels, i, 1, colorMapSize, [i / 7, i / 7, i / 7, 255]);
-        setPixelValue(colorMapLandPixels, i, 2, colorMapSize, [(25 / 255) * i, (25 / 255) * i, (25 / 255) * i, 255]);
-
-        setPixelValue(colorMapWaterPixels, i, 0, colorMapSize,    colorValues.water);
-        setPixelValue(colorMapWaterPixels, i, 1, colorMapSize,    [0,0,0,0]);
-        setPixelValue(colorMapWaterPixels, i, 2, colorMapSize,    [0,0,0,0]);
-        
-        setPixelValue(colorMapLandMaskPixels, i, 0, colorMapSize, colorValues.landMask);
-        setPixelValue(colorMapLandMaskPixels, i, 1, colorMapSize, [0,0,0,0]);
-        setPixelValue(colorMapLandMaskPixels, i, 2, colorMapSize, [0,0,0,0]);
-    }
-    var colorMapLand     = makeSpriteData(colorMapLandPixels    , colorMapSize, 3);
-    var colorMapWater    = makeSpriteData(colorMapWaterPixels   , colorMapSize, 3);
-    var colorMapLandMask = makeSpriteData(colorMapLandMaskPixels, colorMapSize, 3);
-
-
-    var finalLargeHeightBuffer   = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeGradBuffer     = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeNoiseBuffer    = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeTempBuffer     = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeWaterBuffer    = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeLandMaskBuffer = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-
-    fft.bicubic(gl,  fftProgs, heightMap.heightMapBuffer, finalLargeHeightBuffer);
-    
-    fft.gradient(gl, fftProgs, [15, -20], 4, finalLargeHeightBuffer, finalLargeGradBuffer);
-    
-    fft.noise(gl, fftProgs, Math.floor(Math.random() * 65535), finalLargeNoiseBuffer);
-    
-
-    fft.colorMap(gl, fftProgs, colorMapLand, finalLargeHeightBuffer, finalLargeGradBuffer, finalLargeNoiseBuffer, finalLargeTempBuffer);
-
-    fft.colorMap(gl, fftProgs, colorMapWater, finalLargeHeightBuffer, finalLargeHeightBuffer, finalLargeHeightBuffer, finalLargeWaterBuffer);
-
-    fft.colorMap(gl, fftProgs, colorMapLandMask, finalLargeHeightBuffer, finalLargeHeightBuffer, finalLargeHeightBuffer, finalLargeLandMaskBuffer);
-    
-    return {
-        landBuffer: finalLargeTempBuffer,
-        waterBuffer: finalLargeWaterBuffer,
-        landMaskBuffer: finalLargeLandMaskBuffer
-    };
-    
-}
-
-function getWaveBuffer(fft, size, period) {
-    var stages = Math.ceil(Math.log(size) / Math.log(2));
-    var N = 1 << stages; //the resized size
-    
-    var initNoise = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
-    var buffer1   = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
-    var buffer2   = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
-    var buffer3   = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
-    
-    var yx_ratio = upscale.y / upscale.x;
-    
-
-
-    //Have to scale down because the peak of the power spectrum function is high
-    fft.gaussianNoise(gl, fftProgs, Math.floor(Math.random() * 65535), .04, buffer1);
-    
-    //u_1: l
-    //u_2: L
-    //u_3: y/x ratio
-    var shapeNoise = fft.buildCustomProgram(gl, `
-        float k2 = k.x * k.x + (k.y * u_3) * (k.y * u_3);
-    	float l = u_1;
-    	float l2 = l * l;
-        float L = u_2;
-    	float L2 = L * L;
-        
-        float mag;
-        if(k2 == 0.0) {//const mode
-    		mag = 0.0;
-        } else {
-    		mag = exp(- l2 * k2) * exp(- l2 * k2) * exp(- 1.0 / (k2 * L2)) / (k2 * k2);
-    	}
-        b = a * sqrt(mag);
-        `
-    );
-    
-    fft.runCustomProgram(gl, shapeNoise, buffer1, initNoise, 5, 50, yx_ratio);
-    
-    //The angular frequency is given by w^2 = gk, so w = 2pi f = sqrt(gk). 
-    //Bury the constant in g and we get f_k = sqrt(g'k)
-    //f_k must be an integer multiple of a fundamental frequency f_0, or the animation won't loop correctly. 
-    //f_0 is just 1/period, the number of frames in the animation loop.
-	
-    var f_0 = 1 / period; //The fundamental period
-    
-    //u_1: f_0
-    //u_2: 2 * PI * t
-    //u_3: y/x ratio
-    var noiseAtTime = fft.buildCustomProgram(gl, `
-		float lightX = -.8;
-		float lightY = .6;
-        float g = 0.002; //Gravitational constant
-        
-        float kMag = sqrt(k.x * k.x + (k.y * u_3) * (k.y * u_3));
-        float f_k = ceil(sqrt(g * kMag) / u_1) * u_1; //See above
-        float wkt = u_2 * f_k;
-        
-        vec2 timeFac = vec2(cos(wkt), sin(wkt));
-        
-        vec2 h = vec2(a.r * timeFac.r - a.g * timeFac.g, a.r * timeFac.g + a.g * timeFac.r);
-        
-        //b = i k.l * a
-        //k.l = k.x * lightX + k.y * lightY
-        b = vec2(-h.g * (k.x * lightX + k.y * lightY), h.r * (k.x * lightX + k.y * lightY));`
-    );
-
-    //u_1 sets scaling:
-    var chop = fft.buildCustomProgram(gl, `
-    	float maxVal = .1;		
-    	float minVal = -.01;
-        b = min(max((a * u_1 - minVal) / (maxVal - minVal), 0.0), 1.0) * 2.0 - 1.0;
-        `
-    );
-    
-    var colorMapSize = 255;
-    var colorMapPixels = new Uint8Array(colorMapSize * 3 * 4);
-    for(var i = 0; i < colorMapSize; i++) {
-        setPixelValue(colorMapPixels, i, 0, colorMapSize, [255,255,255, Math.floor(i * .5)]);
-        setPixelValue(colorMapPixels, i, 1, colorMapSize, [0  ,0  ,0  , 0]);
-        setPixelValue(colorMapPixels, i, 2, colorMapSize, [0  ,0  ,0  , 0]);
-    }
-    var colorMap = makeSpriteData(colorMapPixels, colorMapSize, 3);
-    
-    var outputTextures = [];
-    
-    for(var t = 0; t < period; t++) {
-        outputTextures[t] = glUtils.makeTexture(N, N, gl.NEAREST, gl.REPEAT, null);
-        var outputBuffer = glUtils.makeFrameBufferTexture(outputTextures[t]);
-        
-        
-        fft.runCustomProgram(gl, noiseAtTime, initNoise, buffer1, f_0, 2 * Math.PI * t, yx_ratio);
-    
-        var fftPlan = fft.makePlan(stages, fft.FFT_DIRECTIONS.BACKWARD, Math.sqrt(N));
-        fft.computeFft(gl, fftProgs, fftPlan, buffer1, buffer2, buffer3);
-    
-    
-        fft.runCustomProgram(gl, chop, buffer2, buffer1, 15);
-    
-        fft.colorMap(gl, fftProgs, colorMap, buffer1, buffer1, buffer1, outputBuffer);
-    }
-    
-    return {initNoise: initNoise, waveTextures: outputTextures};
-}
 
 var map = genMap(fft, 256);
-var waveBuff = getWaveBuffer(fft, 512, 60);
+//var waveBuff = getWaveBuffer(fft, 512, 60);
 
+var boxes = [];
 
+for(var i = 0; i < 256; i++) {
+    for(var j = 0; j < 256; j++) {
+        if(map.mapHeight[i * 256 + j] < NOISE_THRESHOLD)
+            boxes.push({x: j, y: i});
+    }
+}
 
 
 var startTime = null;
+var showBoxes = false;
+
+function onMouseDown() {
+    showBoxes = !showBoxes;
+}
+
+canvas.addEventListener("mousedown", onMouseDown, false);
+
 function frame(timestamp) {
     if (!startTime) 
         startTime = timestamp;
     
-    var progress = timestamp - startTime;
+    var timeDiff = timestamp - startTime;
     
-    var waveSpeed = 40;
-    
-    var t = Math.floor(progress / waveSpeed) % 60;
       
     //t = (t + 1) % 60;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
+    
     gl.useProgram(spriteProgramInfo.program);
     gl.viewport(0, 0, WIDTH, HEIGHT);
     gl.uniform2f(spriteProgramInfo.u_resolution, WIDTH, HEIGHT);
-    drawSprite(gl, 0, 0, map.landBuffer.width, map.landBuffer.height, 5, 5, map.landBuffer.width, map.landBuffer.height, map.landBuffer, [1,1,1,1]);
-    drawSprite(gl, 0, 0, map.waterBuffer.width, map.waterBuffer.height, 5, 5, map.waterBuffer.width, map.waterBuffer.height, map.waterBuffer, [1,1,1,1]);
-
-    drawSpriteMask(gl, 
-        0, 0, map.landMaskBuffer.width, map.landMaskBuffer.height, 
-        0, 0, map.landMaskBuffer.width, map.landMaskBuffer.height, 
-        5, 5, map.landMaskBuffer.width, map.landMaskBuffer.height, 
-        map.landMaskBuffer, 
-        waveBuff.waveTextures[t]
-    );
     
-    drawBox(gl, 30, 40, 50, 60, [1, 0, 0, .5]);
+    drawMap(gl, map, timeDiff);
     
+    if(showBoxes) {
+        for(var i = 0; i < boxes.length; i++) {
+            drawBox(gl, (boxes[i].x -.5) * upscale.x, (boxes[i].y - .5) * upscale.y, upscale.x, upscale.y, [1, 0, 0, .5]);
+        }
+    }
     requestAnimationFrame(frame);
 }
 
+
+
 requestAnimationFrame(frame);
+
+

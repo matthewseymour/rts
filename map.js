@@ -108,7 +108,38 @@ function getWaveTextures(fft, size, period) {
 }
 
 
+function generateHeightMap(fft, stages, scale) {
+    var N = 1 << stages;
+    
+    var buffer1 = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
+    var buffer2 = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
+    var buffer3 = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
 
+
+    fft.gaussianNoise(gl, fftProgs, Math.floor(Math.random() * 65535), 1, buffer1);
+
+    var shapeNoise = fft.buildCustomProgram(gl, `
+        float kMag = sqrt(k.x * k.x + k.y * k.y);
+        float mag;
+        if(kMag < .0001) {
+            mag = 0.0;
+        } else {
+            mag = 1.0 / pow(kMag * 110.0, 1.7);
+        }  
+        //b = (a * 2.0 - 1.0) * mag;
+        b = a * mag;
+        `
+    );
+
+    fft.runCustomProgram(gl, shapeNoise, buffer1, buffer2);
+
+    var fftPlan = fft.makePlan(stages, fft.FFT_DIRECTIONS.BACKWARD, Math.sqrt(N));
+    fft.computeFft(gl, fftProgs, fftPlan, buffer2, buffer1, buffer3);
+    
+    fft.scale(gl, fftProgs, scale, buffer1, buffer2);
+    
+    return {heightMapBuffer: buffer2 };
+}
 
 function getMapBackgroundGrass(value) {
     var noiseThreshold = NOISE_THRESHOLD;

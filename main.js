@@ -184,7 +184,27 @@ function onMouseDown() {
     showBoxes = !showBoxes;
 }
 
+function onKeyDown(args) {
+    switch(args.keyCode) {
+        case KeyCodeEnum.LEFT:
+            view.xOffset--;
+            break;
+        case KeyCodeEnum.RIGHT:
+            view.xOffset++;
+            break;
+        case KeyCodeEnum.UP:
+            view.yOffset++;
+            break;
+        case KeyCodeEnum.DOWN:
+            view.yOffset--;
+            break;
+        
+    }
+}
+
 canvas.addEventListener("mousedown", onMouseDown, false);
+document.onkeydown = onKeyDown;
+
 
 function frame(timestamp) {
     if (!startTime) 

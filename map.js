@@ -2,6 +2,9 @@ var WAVE_SPEED = 40;
 var WAVE_PERIOD = 60;
 var NOISE_THRESHOLD = 100;
 
+var SUB_TILE_WIDTH = 8;
+var SUB_TILE_HEIGHT = 6;
+
 
 function getWaveTextures(fft, size, period) {
     var stages = Math.ceil(Math.log(size) / Math.log(2));
@@ -12,7 +15,7 @@ function getWaveTextures(fft, size, period) {
     var buffer2   = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
     var buffer3   = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
     
-    var yx_ratio = upscale.y / upscale.x;
+    var yx_ratio = SUB_TILE_HEIGHT / SUB_TILE_WIDTH;
     
 
 
@@ -199,8 +202,6 @@ function getMapBackgroundGrass(value) {
 
 
 
-var upscale = {x: 8, y: 6};
-
 function genMap(fft, size) {
     
     //Next power of 2 to incorporate the map size:
@@ -255,12 +256,12 @@ function genMap(fft, size) {
     
 
 
-    var finalLargeHeightBuffer   = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeGradBuffer     = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeNoiseBuffer    = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeTempBuffer     = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeWaterBuffer    = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
-    var finalLargeLandMaskBuffer = glUtils.makeFrameBuffer(N * upscale.x, N * upscale.y, gl.NEAREST);
+    var finalLargeHeightBuffer   = glUtils.makeFrameBuffer(N * SUB_TILE_WIDTH, N * SUB_TILE_HEIGHT, gl.NEAREST);
+    var finalLargeGradBuffer     = glUtils.makeFrameBuffer(N * SUB_TILE_WIDTH, N * SUB_TILE_HEIGHT, gl.NEAREST);
+    var finalLargeNoiseBuffer    = glUtils.makeFrameBuffer(N * SUB_TILE_WIDTH, N * SUB_TILE_HEIGHT, gl.NEAREST);
+    var finalLargeTempBuffer     = glUtils.makeFrameBuffer(N * SUB_TILE_WIDTH, N * SUB_TILE_HEIGHT, gl.NEAREST);
+    var finalLargeWaterBuffer    = glUtils.makeFrameBuffer(N * SUB_TILE_WIDTH, N * SUB_TILE_HEIGHT, gl.NEAREST);
+    var finalLargeLandMaskBuffer = glUtils.makeFrameBuffer(N * SUB_TILE_WIDTH, N * SUB_TILE_HEIGHT, gl.NEAREST);
 
     fft.bicubic(gl,  fftProgs, heightMap.heightMapBuffer, finalLargeHeightBuffer);
     
@@ -289,18 +290,28 @@ function genMap(fft, size) {
 }
 
 
-function drawMap(gl, map, time) {
+function drawMap(gl, map, time, view) {
     
     var waveSpeed = WAVE_SPEED;
     var waveTextureNumber = Math.floor(time / waveSpeed) % WAVE_PERIOD;
     
-    drawSprite(gl, 0, 0, map.landBuffer.width, map.landBuffer.height, 0, 0, map.landBuffer.width, map.landBuffer.height, map.landBuffer, [1,1,1,1]);
-    drawSprite(gl, 0, 0, map.waterBuffer.width, map.waterBuffer.height, 0, 0, map.waterBuffer.width, map.waterBuffer.height, map.waterBuffer, [1,1,1,1]);
+    var xOffset = -view.xOffset * SUB_TILE_WIDTH;
+    var yOffset = -view.yOffset * SUB_TILE_HEIGHT;
+    
+    drawSprite(gl, 
+        0, 0, map.landBuffer.width, map.landBuffer.height, 
+        xOffset, yOffset, map.landBuffer.width, map.landBuffer.height, 
+        map.landBuffer, 
+        [1,1,1,1]);
+    drawSprite(gl, 
+        0, 0, map.waterBuffer.width, map.waterBuffer.height, 
+        xOffset, yOffset, map.waterBuffer.width, map.waterBuffer.height, 
+        map.waterBuffer, [1,1,1,1]);
 
     drawSpriteMask(gl, 
         0, 0, map.landMaskBuffer.width, map.landMaskBuffer.height, 
         0, 0, map.landMaskBuffer.width, map.landMaskBuffer.height, 
-        0, 0, map.landMaskBuffer.width, map.landMaskBuffer.height, 
+        xOffset, yOffset, map.landMaskBuffer.width, map.landMaskBuffer.height, 
         map.landMaskBuffer, 
         map.waves.waveTextures[waveTextureNumber]
     );

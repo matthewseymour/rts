@@ -178,6 +178,7 @@ for(var i = 0; i < 256; i++) {
 
 var startTime = null;
 var showBoxes = false;
+var view = {xOffset: 0, yOffset: 0}
 
 function onMouseDown() {
     showBoxes = !showBoxes;
@@ -201,11 +202,11 @@ function frame(timestamp) {
     gl.viewport(0, 0, WIDTH, HEIGHT);
     gl.uniform2f(spriteProgramInfo.u_resolution, WIDTH, HEIGHT);
     
-    drawMap(gl, map, timeDiff);
+    drawMap(gl, map, timeDiff, view);
     
     if(showBoxes) {
         for(var i = 0; i < boxes.length; i++) {
-            drawBox(gl, (boxes[i].x -.5) * upscale.x, (boxes[i].y - .5) * upscale.y, upscale.x, upscale.y, [1, 0, 0, .5]);
+            drawBox(gl, (boxes[i].x -.5) * SUB_TILE_WIDTH, (boxes[i].y - .5) * SUB_TILE_HEIGHT, SUB_TILE_WIDTH, SUB_TILE_HEIGHT, [1, 0, 0, .5]);
         }
     }
     requestAnimationFrame(frame);

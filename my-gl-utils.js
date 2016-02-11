@@ -2,6 +2,13 @@
 
 var glUtils = {};
 
+glUtils.setPixelValue = function(array, x, y, width, color) {
+    array[(y * width + x) * 4    ] = color[0];
+    array[(y * width + x) * 4 + 1] = color[1];
+    array[(y * width + x) * 4 + 2] = color[2];
+    array[(y * width + x) * 4 + 3] = color[3];
+}
+
 glUtils.generateSimpleUnitRectangleBuffer = function(gl) {
 	var spriteVertexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, spriteVertexBuffer);

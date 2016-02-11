@@ -83,9 +83,9 @@ function getWaveTextures(fft, size, period) {
     var colorMapSize = 255;
     var colorMapPixels = new Uint8Array(colorMapSize * 3 * 4);
     for(var i = 0; i < colorMapSize; i++) {
-        setPixelValue(colorMapPixels, i, 0, colorMapSize, [255,255,255, Math.floor(i * .5)]);
-        setPixelValue(colorMapPixels, i, 1, colorMapSize, [0  ,0  ,0  , 0]);
-        setPixelValue(colorMapPixels, i, 2, colorMapSize, [0  ,0  ,0  , 0]);
+        glUtils.setPixelValue(colorMapPixels, i, 0, colorMapSize, [255,255,255, Math.floor(i * .5)]);
+        glUtils.setPixelValue(colorMapPixels, i, 1, colorMapSize, [0  ,0  ,0  , 0]);
+        glUtils.setPixelValue(colorMapPixels, i, 2, colorMapSize, [0  ,0  ,0  , 0]);
     }
     var colorMap = makeSpriteData(colorMapPixels, colorMapSize, 3);
     
@@ -220,27 +220,27 @@ function genMap(fft, size) {
     var colorMapPassablePixels = new Uint8Array(colorMapSize * 3 * 4);
     
     for(var i = 0; i < colorMapSize; i++) {
-        setPixelValue(colorMapHeightPixels, i, 0, colorMapSize, [i, 0, 0, 0]);
-        setPixelValue(colorMapHeightPixels, i, 1, colorMapSize, [0, 0, 0, 0]);
-        setPixelValue(colorMapHeightPixels, i, 2, colorMapSize, [0, 0, 0, 0]);
+        glUtils.setPixelValue(colorMapHeightPixels, i, 0, colorMapSize, [i, 0, 0, 0]);
+        glUtils.setPixelValue(colorMapHeightPixels, i, 1, colorMapSize, [0, 0, 0, 0]);
+        glUtils.setPixelValue(colorMapHeightPixels, i, 2, colorMapSize, [0, 0, 0, 0]);
         
         var colorValues = getMapBackgroundGrass(i);
-        setPixelValue(colorMapLandPixels, i, 0, colorMapSize, colorValues.land);
-        setPixelValue(colorMapLandPixels, i, 1, colorMapSize, [i / 7, i / 7, i / 7, 255]);
-        setPixelValue(colorMapLandPixels, i, 2, colorMapSize, [(25 / 255) * i, (25 / 255) * i, (25 / 255) * i, 255]);
+        glUtils.setPixelValue(colorMapLandPixels, i, 0, colorMapSize, colorValues.land);
+        glUtils.setPixelValue(colorMapLandPixels, i, 1, colorMapSize, [i / 7, i / 7, i / 7, 255]);
+        glUtils.setPixelValue(colorMapLandPixels, i, 2, colorMapSize, [(25 / 255) * i, (25 / 255) * i, (25 / 255) * i, 255]);
 
-        setPixelValue(colorMapWaterPixels, i, 0, colorMapSize,    colorValues.water);
-        setPixelValue(colorMapWaterPixels, i, 1, colorMapSize,    [0,0,0,0]);
-        setPixelValue(colorMapWaterPixels, i, 2, colorMapSize,    [0,0,0,0]);
+        glUtils.setPixelValue(colorMapWaterPixels, i, 0, colorMapSize,    colorValues.water);
+        glUtils.setPixelValue(colorMapWaterPixels, i, 1, colorMapSize,    [0,0,0,0]);
+        glUtils.setPixelValue(colorMapWaterPixels, i, 2, colorMapSize,    [0,0,0,0]);
         
-        setPixelValue(colorMapLandMaskPixels, i, 0, colorMapSize, colorValues.landMask);
-        setPixelValue(colorMapLandMaskPixels, i, 1, colorMapSize, [0,0,0,0]);
-        setPixelValue(colorMapLandMaskPixels, i, 2, colorMapSize, [0,0,0,0]);
+        glUtils.setPixelValue(colorMapLandMaskPixels, i, 0, colorMapSize, colorValues.landMask);
+        glUtils.setPixelValue(colorMapLandMaskPixels, i, 1, colorMapSize, [0,0,0,0]);
+        glUtils.setPixelValue(colorMapLandMaskPixels, i, 2, colorMapSize, [0,0,0,0]);
         
         
-        setPixelValue(colorMapPassablePixels, i, 0, colorMapSize, [255, 255, 255, (i >= NOISE_THRESHOLD ? 0 : 255)]);
-        setPixelValue(colorMapPassablePixels, i, 1, colorMapSize, [0,0,0,0]);
-        setPixelValue(colorMapPassablePixels, i, 2, colorMapSize, [0,0,0,0]);
+        glUtils.setPixelValue(colorMapPassablePixels, i, 0, colorMapSize, [255, 255, 255, (i >= NOISE_THRESHOLD ? 0 : 255)]);
+        glUtils.setPixelValue(colorMapPassablePixels, i, 1, colorMapSize, [0,0,0,0]);
+        glUtils.setPixelValue(colorMapPassablePixels, i, 2, colorMapSize, [0,0,0,0]);
     }
     
     

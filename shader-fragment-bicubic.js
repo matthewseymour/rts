@@ -14,8 +14,9 @@ vec2 cubicInterpolator(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float x) {
 }
 
 void main() {
-    vec2 texCoord = floor(v_texCoord * u_size);
-    vec2 position = fract(v_texCoord * u_size);
+    vec2 scaledTexCoord = v_texCoord * u_size - .5; //-.5 aligns the result to match simple scaling
+    vec2 texCoord = floor(scaledTexCoord);
+    vec2 position = fract(scaledTexCoord);
     
     
     //Read 4x4 grid of points:

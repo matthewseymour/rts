@@ -38,6 +38,15 @@ var primitiveProgramInfo = (function () {
     
     programInfo.vertexBuffer = glUtils.generateSimpleUnitRectangleBuffer(gl);
     
+    programInfo.lineVertexBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, programInfo.lineVertexBuffer);
+
+	gl.bufferData(
+		gl.ARRAY_BUFFER,
+		new Float32Array([
+			0.0, 0.0,
+			1.0, 1.0]),
+		gl.STATIC_DRAW);	
 	
     return programInfo;
 })();
@@ -77,7 +86,6 @@ var spriteMaskProgramInfo = (function () {
     return programInfo;
 })();
 
-var fftProgs = fft.getPrograms(gl);
 
 function makeSpriteData(data, width, height) {
     return glUtils.makeTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, data);
@@ -99,6 +107,21 @@ function drawBox(gl, x, y, w, h, color) {
 	
 }
 
+function drawLine(gl, x1, y1, x2, y2, color) {
+	gl.useProgram(primitiveProgramInfo.program);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, primitiveProgramInfo.lineVertexBuffer);
+	gl.vertexAttribPointer(primitiveProgramInfo.attribsUniforms.a_position, 2, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(primitiveProgramInfo.attribsUniforms.a_position);
+
+	primitiveProgramInfo.setters.u_position([x1, y1]);
+	primitiveProgramInfo.setters.u_size([x2 - x1, y2 - y1]);
+	primitiveProgramInfo.setters.u_color(color);
+	
+	//draw
+	gl.drawArrays(gl.LINES, 0, 2);
+	
+}
 
 function drawSprite(gl, sx, sy, sw, sh, x, y, w, h, sprite, mask) {
 	gl.useProgram(spriteProgramInfo.program);
@@ -156,6 +179,7 @@ function drawSpriteMask(gl, sx, sy, sw, sh, mx, my, mw, mh, x, y, w, h, sprite, 
 
 
 
+var fftProgs = fft.getPrograms(gl);
 
 
 var map = genMap(fft, 256);

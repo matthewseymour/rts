@@ -216,7 +216,6 @@ function frame(timestamp) {
     var timeDiff = timestamp - startTime;
     
       
-    //t = (t + 1) % 60;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);

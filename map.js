@@ -217,6 +217,7 @@ function genMap(fft, size) {
     var colorMapLandPixels     = new Uint8Array(colorMapSize * 3 * 4);
     var colorMapWaterPixels    = new Uint8Array(colorMapSize * 3 * 4);
     var colorMapLandMaskPixels = new Uint8Array(colorMapSize * 3 * 4);
+    var colorMapPassablePixels = new Uint8Array(colorMapSize * 3 * 4);
     
     for(var i = 0; i < colorMapSize; i++) {
         setPixelValue(colorMapHeightPixels, i, 0, colorMapSize, [i, 0, 0, 0]);
@@ -235,15 +236,24 @@ function genMap(fft, size) {
         setPixelValue(colorMapLandMaskPixels, i, 0, colorMapSize, colorValues.landMask);
         setPixelValue(colorMapLandMaskPixels, i, 1, colorMapSize, [0,0,0,0]);
         setPixelValue(colorMapLandMaskPixels, i, 2, colorMapSize, [0,0,0,0]);
+        
+        
+        setPixelValue(colorMapPassablePixels, i, 0, colorMapSize, [255, 255, 255, (i >= NOISE_THRESHOLD ? 0 : 255)]);
+        setPixelValue(colorMapPassablePixels, i, 1, colorMapSize, [0,0,0,0]);
+        setPixelValue(colorMapPassablePixels, i, 2, colorMapSize, [0,0,0,0]);
     }
+    
+    
     var colorMapHeight   = makeSpriteData(colorMapHeightPixels  , colorMapSize, 3);
     var colorMapLand     = makeSpriteData(colorMapLandPixels    , colorMapSize, 3);
     var colorMapWater    = makeSpriteData(colorMapWaterPixels   , colorMapSize, 3);
     var colorMapLandMask = makeSpriteData(colorMapLandMaskPixels, colorMapSize, 3);
-
+    var colorMapPassable = makeSpriteData(colorMapPassablePixels, colorMapSize, 3);
+    
     //Map the height to the 0-255 range in red, then read off the pixels
+    /*
     var heightBuffer = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
-    fft.colorMap(gl, fftProgs, colorMapHeight, heightMap.heightMapBuffer, heightMap, heightMap, heightBuffer);
+    fft.colorMap(gl, fftProgs, colorMapHeight, heightMap.heightMapBuffer, heightMap.heightMapBuffer, heightMap.heightMapBuffer, heightBuffer);
     
     var heightBufferPixels = new Uint8Array(N * N * 4);
     gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, heightBufferPixels);
@@ -252,7 +262,18 @@ function genMap(fft, size) {
     var mapHeight = new Uint8Array(N * N);
     for(var i = 0; i < N * N; i++)
         mapHeight[i] = heightBufferPixels[i * 4];
-        
+    */  
+    var passableBuffer = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
+    fft.colorMap(gl, fftProgs, colorMapPassable, heightMap.heightMapBuffer, heightMap.heightMapBuffer, heightMap.heightMapBuffer, passableBuffer);
+
+    var passableBufferPixels = new Uint8Array(N * N * 4);
+    gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, passableBufferPixels);
+
+    //Map pass is just whether a point is passable or not:
+    //Read from the alpha channel
+    var mapPass = new Uint8Array(N * N);
+    for(var i = 0; i < N * N; i++)
+        mapPass[i] = passableBufferPixels[i * 4 + 3] == 255 ? 0 : 1;
     
 
 
@@ -282,7 +303,8 @@ function genMap(fft, size) {
         landBuffer: finalLargeTempBuffer,
         waterBuffer: finalLargeWaterBuffer,
         landMaskBuffer: finalLargeLandMaskBuffer,
-        mapHeight: mapHeight,
+        passableBuffer: passableBuffer,
+        mapPass: mapPass,
         waves: waves,
         waveTime: 0
     };
@@ -290,7 +312,7 @@ function genMap(fft, size) {
 }
 
 
-function drawMap(gl, map, time, view) {
+function drawMap(gl, map, time, view, options) {
     
     var waveSpeed = WAVE_SPEED;
     var waveTextureNumber = Math.floor(time / waveSpeed) % WAVE_PERIOD;
@@ -303,6 +325,7 @@ function drawMap(gl, map, time, view) {
         xOffset, yOffset, map.landBuffer.width, map.landBuffer.height, 
         map.landBuffer, 
         [1,1,1,1]);
+    
     drawSprite(gl, 
         0, 0, map.waterBuffer.width, map.waterBuffer.height, 
         xOffset, yOffset, map.waterBuffer.width, map.waterBuffer.height, 
@@ -315,6 +338,13 @@ function drawMap(gl, map, time, view) {
         map.landMaskBuffer, 
         map.waves.waveTextures[waveTextureNumber]
     );
+    
+    if(options.showPassable) {
+        drawSprite(gl, 
+            0, 0, map.passableBuffer.width, map.passableBuffer.height, 
+            xOffset, yOffset, map.passableBuffer.width * SUB_TILE_WIDTH, map.passableBuffer.height * SUB_TILE_HEIGHT, 
+            map.passableBuffer, [1,0,0,.5]);
+    }
     
     
     

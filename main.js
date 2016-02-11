@@ -170,18 +170,17 @@ var boxes = [];
 
 for(var i = 0; i < 256; i++) {
     for(var j = 0; j < 256; j++) {
-        if(map.mapHeight[i * 256 + j] < NOISE_THRESHOLD)
+        if(map.mapPass[i * 256 + j] == 0)
             boxes.push({x: j, y: i});
     }
 }
 
 
 var startTime = null;
-var showBoxes = false;
+var showPassable = false;
 var view = {xOffset: 0, yOffset: 0}
 
 function onMouseDown() {
-    showBoxes = !showBoxes;
 }
 
 function onKeyDown(args) {
@@ -197,6 +196,10 @@ function onKeyDown(args) {
             break;
         case KeyCodeEnum.DOWN:
             view.yOffset--;
+            break;
+            
+        case KeyCodeEnum.P:
+            showPassable = !showPassable;
             break;
         
     }
@@ -222,13 +225,8 @@ function frame(timestamp) {
     gl.viewport(0, 0, WIDTH, HEIGHT);
     gl.uniform2f(spriteProgramInfo.u_resolution, WIDTH, HEIGHT);
     
-    drawMap(gl, map, timeDiff, view);
+    drawMap(gl, map, timeDiff, view, {showPassable: showPassable});
     
-    if(showBoxes) {
-        for(var i = 0; i < boxes.length; i++) {
-            drawBox(gl, (boxes[i].x -.5) * SUB_TILE_WIDTH, (boxes[i].y - .5) * SUB_TILE_HEIGHT, SUB_TILE_WIDTH, SUB_TILE_HEIGHT, [1, 0, 0, .5]);
-        }
-    }
     requestAnimationFrame(frame);
 }
 

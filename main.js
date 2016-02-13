@@ -2,9 +2,33 @@
 
 "use strict";
 
+var SUB_TILE_WIDTH = 8;
+var SUB_TILE_HEIGHT = 6;
+
+
 var WIDTH  = document.body.offsetWidth;
 var HEIGHT = document.body.offsetHeight;
 
+function getMousePosition(e, canvas) {
+	var x;
+    var y;
+    if (e.pageX || e.pageY) {
+      x = e.pageX;
+      y = e.pageY;
+    }
+    else {
+      x = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+      y = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+    }
+
+	x -= canvas.offsetLeft;
+	y -= canvas.offsetTop;
+	return {x: x, y: y};
+}
+
+function mouseToMap(mousePos) {
+    return {x: mousePos.x, y: HEIGHT - mousePos.y};
+}
 
 
 var canvas = document.getElementById("canvas");
@@ -182,18 +206,8 @@ function drawSpriteMask(gl, sx, sy, sw, sh, mx, my, mw, mh, x, y, w, h, sprite, 
 var fftProgs = fft.getPrograms(gl);
 
 
-var map = genMap(fft, 256);
-//var waveBuff = getWaveBuffer(fft, 512, 60);
-
-var boxes = [];
-
-for(var i = 0; i < 256; i++) {
-    for(var j = 0; j < 256; j++) {
-        if(map.mapPass[i * 256 + j] == 0)
-            boxes.push({x: j, y: i});
-    }
-}
-
+var map = genMap(fft, 512);
+var currentMousePos = {x: 0, y: 0};
 
 var startTime = null;
 var showPassable = false;
@@ -202,19 +216,24 @@ var view = {xOffset: 0, yOffset: 0}
 function onMouseDown() {
 }
 
+function onMouseMove(e) {
+	currentMousePos = getMousePosition(e, canvas);
+}
+
 function onKeyDown(args) {
+    var SCROLL_RATE = 4;
     switch(args.keyCode) {
         case KeyCodeEnum.LEFT:
-            view.xOffset--;
+            view.xOffset -= SCROLL_RATE;
             break;
         case KeyCodeEnum.RIGHT:
-            view.xOffset++;
+            view.xOffset += SCROLL_RATE;
             break;
         case KeyCodeEnum.UP:
-            view.yOffset++;
+            view.yOffset += SCROLL_RATE;
             break;
         case KeyCodeEnum.DOWN:
-            view.yOffset--;
+            view.yOffset -= SCROLL_RATE;
             break;
             
         case KeyCodeEnum.P:
@@ -225,6 +244,7 @@ function onKeyDown(args) {
 }
 
 canvas.addEventListener("mousedown", onMouseDown, false);
+canvas.addEventListener("mousemove", onMouseMove, false);
 document.onkeydown = onKeyDown;
 
 
@@ -244,6 +264,20 @@ function frame(timestamp) {
     gl.uniform2f(spriteProgramInfo.u_resolution, WIDTH, HEIGHT);
     
     drawMap(gl, map, timeDiff, view, {showPassable: showPassable});
+    
+    
+    
+    function test(a, b) {
+        var pos1 = convertToScreen(a, view);
+        var pos2 = convertToScreen(b, view);
+    
+        drawLineBox(a, b, 2, gl, view)
+        drawLine(gl, pos1.x, pos1.y, pos2.x, pos2.y, [1,0,0,1]);
+    }
+    
+    var b = convertToWorld(mouseToMap(currentMousePos), view);
+    //test({x: 80.5, y: 80.5}, b);
+    test({x: Math.random() * 512, y: Math.random() * 512}, {x: Math.random() * 512, y: Math.random() * 512});
     
     requestAnimationFrame(frame);
 }

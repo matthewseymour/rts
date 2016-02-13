@@ -1,9 +1,8 @@
 var WAVE_SPEED = 40;
 var WAVE_PERIOD = 60;
-var NOISE_THRESHOLD = 100;
+var SEA_LEVEL = 100; //Level on the heightmap (0-255) at which there is water
+var TANK_DRIVE_DEPTH = 10; //Level below sealevel where tanks can still drive
 
-var SUB_TILE_WIDTH = 8;
-var SUB_TILE_HEIGHT = 6;
 
 
 function getWaveTextures(fft, size, period) {
@@ -145,39 +144,39 @@ function generateHeightMap(fft, stages, scale) {
 }
 
 function getMapBackgroundGrass(value) {
-    var noiseThreshold = NOISE_THRESHOLD;
+    var seaLevel = SEA_LEVEL;
     var land;
     var water;
     var landMask;
     
 	
-	if(value < noiseThreshold + 5) //Land
+	if(value < seaLevel + 5) //Land
 	{
-		var tempValue = value - noiseThreshold;
-        land = [Math.max(0, Math.round(tempValue * 300 / (255 - noiseThreshold)) + 75),
-				Math.max(0, Math.round(tempValue * 300 / (255 - noiseThreshold)) + 75),
+		var tempValue = value - seaLevel;
+        land = [Math.max(0, Math.round(tempValue * 300 / (255 - seaLevel)) + 75),
+				Math.max(0, Math.round(tempValue * 300 / (255 - seaLevel)) + 75),
 				0,
                 255];
     }               
 	else
 	{
-		var tempValue = value - noiseThreshold;
-		land = [Math.round(tempValue * 45 / (255 - noiseThreshold)) + 80,
-				Math.round(tempValue * 45 / (255 - noiseThreshold)) + 130,
-				Math.round(tempValue * 25 / (255 - noiseThreshold)) + 40,
+		var tempValue = value - seaLevel;
+		land = [Math.round(tempValue * 45 / (255 - seaLevel)) + 80,
+				Math.round(tempValue * 45 / (255 - seaLevel)) + 130,
+				Math.round(tempValue * 25 / (255 - seaLevel)) + 40,
                 255];
 	}
     
     
-    if(value < noiseThreshold) 
+    if(value < seaLevel) 
     {
         var transparency = 0;
-        if(value > noiseThreshold - 5) {
-            transparency = Math.floor(255 * (value - (noiseThreshold + 5)) / 5);
+        if(value > seaLevel - 5) {
+            transparency = Math.floor(255 * (value - (seaLevel + 5)) / 5);
         }
-        water = [Math.round(value *  45 / noiseThreshold) +  0,
-    			 Math.round(value *  75 / noiseThreshold) + 75,
-    			 Math.round(value *  85 / noiseThreshold) + 85,
+        water = [Math.round(value *  45 / seaLevel) +  0,
+    			 Math.round(value *  75 / seaLevel) + 75,
+    			 Math.round(value *  85 / seaLevel) + 85,
                  255 - transparency];
     } 
     else 
@@ -185,9 +184,9 @@ function getMapBackgroundGrass(value) {
         water = [0,0,0,0];
     }
     
-	if(value < noiseThreshold) 
+	if(value < seaLevel) 
     {
-        var mask = Math.floor(255 * value / noiseThreshold);
+        var mask = Math.floor(255 * value / seaLevel);
 		landMask = [255, 255, 255, 255 - mask];
 	} 
     else 
@@ -238,8 +237,9 @@ function genMap(fft, size) {
         glUtils.setPixelValue(colorMapLandMaskPixels, i, 2, colorMapSize, [0,0,0,0]);
         
         
-        glUtils.setPixelValue(colorMapPassablePixels, i, 0, colorMapSize, [255, 255, 255, (i >= NOISE_THRESHOLD ? 0 : 255)]);
-        glUtils.setPixelValue(colorMapPassablePixels, i, 1, colorMapSize, [0,0,0,0]);
+        //Put the "standard passibility" in the red channel, and the tank passibility (tanks can drive in shallow water) in the blue channel. Also put the "standard passibility" in the alpha channel so we can draw this easily for debugging purposes.
+        glUtils.setPixelValue(colorMapPassablePixels, i, 0, colorMapSize, [(i >= SEA_LEVEL ? 0 : 255), 0, 0, (i >= SEA_LEVEL ? 0 : 255)]);
+        glUtils.setPixelValue(colorMapPassablePixels, i, 1, colorMapSize, [0, 0, (i >= SEA_LEVEL - TANK_DRIVE_DEPTH ? 0 : 255), 0]);
         glUtils.setPixelValue(colorMapPassablePixels, i, 2, colorMapSize, [0,0,0,0]);
     }
     
@@ -250,19 +250,6 @@ function genMap(fft, size) {
     var colorMapLandMask = makeSpriteData(colorMapLandMaskPixels, colorMapSize, 3);
     var colorMapPassable = makeSpriteData(colorMapPassablePixels, colorMapSize, 3);
     
-    //Map the height to the 0-255 range in red, then read off the pixels
-    /*
-    var heightBuffer = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
-    fft.colorMap(gl, fftProgs, colorMapHeight, heightMap.heightMapBuffer, heightMap.heightMapBuffer, heightMap.heightMapBuffer, heightBuffer);
-    
-    var heightBufferPixels = new Uint8Array(N * N * 4);
-    gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, heightBufferPixels);
-    
-    //Now just copy out the red channel to get a height map:
-    var mapHeight = new Uint8Array(N * N);
-    for(var i = 0; i < N * N; i++)
-        mapHeight[i] = heightBufferPixels[i * 4];
-    */  
     var passableBuffer = glUtils.makeFrameBuffer(N, N, gl.NEAREST);
     fft.colorMap(gl, fftProgs, colorMapPassable, heightMap.heightMapBuffer, heightMap.heightMapBuffer, heightMap.heightMapBuffer, passableBuffer);
 
@@ -270,10 +257,13 @@ function genMap(fft, size) {
     gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, passableBufferPixels);
 
     //Map pass is just whether a point is passable or not:
-    //Read from the alpha channel
+    //Read from the red and blue channels
     var mapPass = new Uint8Array(N * N);
-    for(var i = 0; i < N * N; i++)
-        mapPass[i] = passableBufferPixels[i * 4 + 3] == 255 ? 0 : 1;
+    var mapPassTank = new Uint8Array(N * N);
+    for(var i = 0; i < N * N; i++) {
+        mapPass[i]     = passableBufferPixels[i * 4 + 0] == 255 ? 0 : 1;
+        mapPassTank[i] = passableBufferPixels[i * 4 + 2] == 255 ? 0 : 1;
+    }
     
 
 
@@ -305,9 +295,111 @@ function genMap(fft, size) {
         landMaskBuffer: finalLargeLandMaskBuffer,
         passableBuffer: passableBuffer,
         mapPass: mapPass,
+        mapPass: mapPassTank,
         waves: waves,
         waveTime: 0
     };
+    
+}
+
+function drawLineBox(a, b, size, gl, view) {
+    function drawHorizontalLine(xL, xR, y) {
+        var topLeft = convertToScreen({x: xL, y: y}, view);
+        var bottomRight = convertToScreen({x: xR, y: y + 1}, view);
+        drawBox(gl, topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y, [0,1,0,.5]);
+    }
+    
+    function drawVerticalLine(yL, yU, x) {
+        var topLeft = convertToScreen({x: x, y: yL}, view);
+        var bottomRight = convertToScreen({x: x + 1, y: yU}, view);
+        drawBox(gl, topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y, [0,1,0,.5]);
+    }
+    
+    function drawSimpleLine(a, b) {
+        var pos1 = convertToScreen(a, view);
+        var pos2 = convertToScreen(b, view);
+    
+        drawLine(gl, pos1.x, pos1.y, pos2.x, pos2.y, [1,1,1,1]);
+    }
+    
+        
+    var dx = b.x - a.x;
+    var dy = b.y - a.y;
+    
+    var start, end;
+    if(Math.abs(dx) > Math.abs(dy)) {
+        if(a.x < b.x) {
+            start = a;
+            end   = b;
+        } else {
+            start = b;
+            end   = a;
+        }
+    } else {
+        if(a.y < b.y) {
+            start = a;
+            end   = b;
+        } else {
+            start = b;
+            end   = a;
+        }
+    }        
+    
+    var X1 = start.x - size;
+    var X2 = start.x + size;
+    var X3 =   end.x - size;
+    var X4 =   end.x + size;
+
+    var Y1 = start.y - size;
+    var Y2 = start.y + size;
+    var Y3 =   end.y - size;
+    var Y4 =   end.y + size;
+    
+    drawSimpleLine({x: X1, y: Y1}, {x: X3, y: Y3});
+    drawSimpleLine({x: X2, y: Y1}, {x: X4, y: Y3});
+    drawSimpleLine({x: X1, y: Y2}, {x: X3, y: Y4});
+    drawSimpleLine({x: X2, y: Y2}, {x: X4, y: Y4});
+
+    var x1 = Math.floor(X1);
+    var x2 =  Math.ceil(X2);
+    var x3 = Math.floor(X3);
+    var x4 =  Math.ceil(X4);
+
+    var y1 = Math.floor(Y1);
+    var y2 =  Math.ceil(Y2);
+    var y3 = Math.floor(Y3);
+    var y4 =  Math.ceil(Y4);
+    
+    if(Math.abs(dx) > Math.abs(dy)) {
+        if(start.y <= end.y) {
+            for(var yi = y1; yi < y4; yi++) {
+                var xL = yi <  y2 ? x1 : Math.floor(X1 + (X3 - X1) * (yi     - Y2) / (Y4 - Y2));
+                var xR = y3 <= yi ? x4 :  Math.ceil(X2 + (X4 - X2) * (yi + 1 - Y1) / (Y3 - Y1));
+                drawHorizontalLine(xL, xR, yi);
+            }
+        } else {
+            for(var yi = y3; yi < y2; yi++) {
+                var xL = y1 <= yi ? x1 : Math.floor(X1 + (X3 - X1) * (yi + 1 - Y1) / (Y3 - Y1));
+                var xR = yi <  y4 ? x4 :  Math.ceil(X2 + (X4 - X2) * (yi     - Y2) / (Y4 - Y2));
+                drawHorizontalLine(xL, xR, yi);
+            }
+        }
+    } else {
+        if(start.x <= end.x) {
+            for(var xi = x1; xi < x4; xi++) {
+                var yL = xi <  x2 ? y1 : Math.floor(Y1 + (Y3 - Y1) * (xi     - X2) / (X4 - X2));
+                var yU = x3 <= xi ? y4 :  Math.ceil(Y2 + (Y4 - Y2) * (xi + 1 - X1) / (X3 - X1));
+                drawVerticalLine(yL, yU, xi);
+            }
+        } else {
+            for(var xi = x3; xi < x2; xi++) {
+                var yL = x1 <= xi ? y1 : Math.floor(Y1 + (Y3 - Y1) * (xi + 1 - X1) / (X3 - X1));
+                var yU = xi <  x4 ? y4 :  Math.ceil(Y2 + (Y4 - Y2) * (xi     - X2) / (X4 - X2));
+                drawVerticalLine(yL, yU, xi);
+            }
+        }
+    }
+    
     
 }
 
@@ -317,8 +409,9 @@ function drawMap(gl, map, time, view, options) {
     var waveSpeed = WAVE_SPEED;
     var waveTextureNumber = Math.floor(time / waveSpeed) % WAVE_PERIOD;
     
-    var xOffset = -view.xOffset * SUB_TILE_WIDTH;
-    var yOffset = -view.yOffset * SUB_TILE_HEIGHT;
+    var offset = convertToScreen({x: 0, y: 0}, view);
+    var xOffset = offset.x;
+    var yOffset = offset.y;
     
     drawSprite(gl, 
         0, 0, map.landBuffer.width, map.landBuffer.height, 
@@ -343,8 +436,9 @@ function drawMap(gl, map, time, view, options) {
         drawSprite(gl, 
             0, 0, map.passableBuffer.width, map.passableBuffer.height, 
             xOffset, yOffset, map.passableBuffer.width * SUB_TILE_WIDTH, map.passableBuffer.height * SUB_TILE_HEIGHT, 
-            map.passableBuffer, [1,0,0,.5]);
+            map.passableBuffer, [1,1,1,.5]);
     }
+    
     
     
     

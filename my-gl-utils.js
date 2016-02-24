@@ -1,6 +1,6 @@
 "use strict";
 
-var glUtils = {};
+const glUtils = {};
 
 glUtils.setPixelValue = function(array, x, y, width, color) {
     array[(y * width + x) * 4    ] = color[0];
@@ -61,6 +61,10 @@ glUtils.makeProgram = function(gl, vertexShaderSource, fragmentShaderSource, att
     info.setters = createUniformSetters(gl, info.program);
 
     return info;
+}
+
+glUtils.makeSimpleTexture = function(width, height, data) {
+    return glUtils.makeTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, data);
 }
 
 

@@ -2,282 +2,193 @@
 
 "use strict";
 
-var SUB_TILE_WIDTH = 8;
-var SUB_TILE_HEIGHT = 6;
+const SUB_TILE_WIDTH = 8;
+const SUB_TILE_HEIGHT = 6;
+const SCROLL_RATE = 8;
+const UPDATE_PERIOD = 100;
+const UNIT_SIZE = 2;
 
 
-var WIDTH  = document.body.offsetWidth;
-var HEIGHT = document.body.offsetHeight;
 
-function getMousePosition(e, canvas) {
-	var x;
-    var y;
-    if (e.pageX || e.pageY) {
-      x = e.pageX;
-      y = e.pageY;
-    }
-    else {
-      x = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-      y = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
-    }
 
-	x -= canvas.offsetLeft;
-	y -= canvas.offsetTop;
-	return {x: x, y: y};
+
+var gl = screen.canvas.getContext("experimental-webgl", 
+{
+    alpha: false,
+    antialias: true
+});
+
+function changeScissorDims() {
+    graphicsPrograms.gl.scissor(screen.left, screen.bottom, screen.right - screen.left, screen.top - screen.bottom);
 }
 
-function mouseToMap(mousePos) {
-    return {x: mousePos.x, y: HEIGHT - mousePos.y};
-}
+screen.onResize.push(changeScissorDims);
 
-
-var canvas = document.getElementById("canvas");
-canvas.width = WIDTH;
-canvas.height = HEIGHT;
-
-
-var gl = canvas.getContext("experimental-webgl", 
-    {
-        alpha: false,
-        //antialias: true
-    });
-gl.disable(gl.BLEND);
-
-
-
-
-
-
-
-var primitiveProgramInfo = (function () {
-    var programInfo = glUtils.makeProgram(
-        gl, primitiveVertexSource, primitiveFragmentSource, 
-        ["a_position"], 
-        ["u_resolution", "u_position", "u_size", "u_color"]
-    );
-    
-	//set resolution:
-	gl.useProgram(programInfo.program);
-    programInfo.setters.u_resolution([canvas.width, canvas.height]);
-    
-    programInfo.vertexBuffer = glUtils.generateSimpleUnitRectangleBuffer(gl);
-    
-    programInfo.lineVertexBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, programInfo.lineVertexBuffer);
-
-	gl.bufferData(
-		gl.ARRAY_BUFFER,
-		new Float32Array([
-			0.0, 0.0,
-			1.0, 1.0]),
-		gl.STATIC_DRAW);	
-	
-    return programInfo;
-})();
-
-var spriteProgramInfo = (function () {
-    var programInfo = glUtils.makeProgram(
-        gl, spriteVertexSource, spriteFragmentSource, 
-        ["a_position", "a_texCoord"], 
-        ["u_image", "u_mask", "u_resolution", "u_position", "u_size", "u_texResolution", "u_texPosition", "u_texSize"]
-    );
-    
-	//set resolution:
-	gl.useProgram(programInfo.program);
-    programInfo.setters.u_resolution([canvas.width, canvas.height]);
-    
-    programInfo.spriteVertexBuffer = glUtils.generateSimpleUnitRectangleBuffer(gl);
-    
-	
-    return programInfo;
-})();
-
-var spriteMaskProgramInfo = (function () {
-    var programInfo = glUtils.makeProgram(
-        gl, spriteMaskVertexSource, spriteMaskFragmentSource, 
-        ["a_position", "a_texCoord"], 
-        ["u_image", "u_mask", "u_resolution", "u_position", "u_size", "u_texResolution", 
-         "u_texPosition", "u_texSize", "u_maskTexResolution", "u_maskTexPosition", "u_maskTexSize"]
-    );
-    
-	//set resolution:
-	gl.useProgram(programInfo.program);
-    programInfo.setters.u_resolution([canvas.width, canvas.height]);
-    
-    programInfo.spriteVertexBuffer = glUtils.generateSimpleUnitRectangleBuffer(gl);
-    
-	
-    return programInfo;
-})();
-
-
-function makeSpriteData(data, width, height) {
-    return glUtils.makeTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, data);
-}
-
-function drawBox(gl, x, y, w, h, color) {
-	gl.useProgram(primitiveProgramInfo.program);
-
-	gl.bindBuffer(gl.ARRAY_BUFFER, primitiveProgramInfo.vertexBuffer);
-	gl.vertexAttribPointer(primitiveProgramInfo.attribsUniforms.a_position, 2, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(primitiveProgramInfo.attribsUniforms.a_position);
-
-	primitiveProgramInfo.setters.u_position([x, y]);
-	primitiveProgramInfo.setters.u_size([w, h]);
-	primitiveProgramInfo.setters.u_color(color);
-	
-	//draw
-	gl.drawArrays(gl.TRIANGLES, 0, 6);
-	
-}
-
-function drawLine(gl, x1, y1, x2, y2, color) {
-	gl.useProgram(primitiveProgramInfo.program);
-
-	gl.bindBuffer(gl.ARRAY_BUFFER, primitiveProgramInfo.lineVertexBuffer);
-	gl.vertexAttribPointer(primitiveProgramInfo.attribsUniforms.a_position, 2, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(primitiveProgramInfo.attribsUniforms.a_position);
-
-	primitiveProgramInfo.setters.u_position([x1, y1]);
-	primitiveProgramInfo.setters.u_size([x2 - x1, y2 - y1]);
-	primitiveProgramInfo.setters.u_color(color);
-	
-	//draw
-	gl.drawArrays(gl.LINES, 0, 2);
-	
-}
-
-function drawSprite(gl, sx, sy, sw, sh, x, y, w, h, sprite, mask) {
-	gl.useProgram(spriteProgramInfo.program);
-	
-    glUtils.bindRectBuffer(gl, spriteProgramInfo, spriteProgramInfo.spriteVertexBuffer);
-
-	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_2D, sprite.texture);
-
-	spriteProgramInfo.setters.u_position([x, y]);
-	spriteProgramInfo.setters.u_size([w, h]);
-	spriteProgramInfo.setters.u_image(0);
-	spriteProgramInfo.setters.u_texResolution([sprite.width, sprite.height]);
-	spriteProgramInfo.setters.u_texPosition([sx, sy]);
-	spriteProgramInfo.setters.u_texSize([sw, sh]);
-	spriteProgramInfo.setters.u_mask(mask);
-	
-	//draw
-	gl.drawArrays(gl.TRIANGLES, 0, 6);
-	
-}
-
-//The mask is another sprite
-function drawSpriteMask(gl, sx, sy, sw, sh, mx, my, mw, mh, x, y, w, h, sprite, mask) {
-	gl.useProgram(spriteMaskProgramInfo.program);
-	
-    glUtils.bindRectBuffer(gl, spriteMaskProgramInfo, spriteMaskProgramInfo.spriteVertexBuffer);
-
-	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_2D, sprite.texture);
-
-	gl.activeTexture(gl.TEXTURE1);
-	gl.bindTexture(gl.TEXTURE_2D, mask.texture);
-
-	spriteMaskProgramInfo.setters.u_position([x, y]);
-	spriteMaskProgramInfo.setters.u_size([w, h]);
-	spriteMaskProgramInfo.setters.u_image(0);
-	spriteMaskProgramInfo.setters.u_texResolution([sprite.width, sprite.height]);
-	spriteMaskProgramInfo.setters.u_texPosition([sx, sy]);
-	spriteMaskProgramInfo.setters.u_texSize([sw, sh]);
-
-	spriteMaskProgramInfo.setters.u_maskTexResolution([mask.width, mask.height]);
-	spriteMaskProgramInfo.setters.u_maskTexPosition([mx, my]);
-	spriteMaskProgramInfo.setters.u_maskTexSize([mw, mh]);
-	spriteMaskProgramInfo.setters.u_mask(1);
-	
-	//draw
-	gl.drawArrays(gl.TRIANGLES, 0, 6);
-	
-}
-
-
-
-
-
-
-
+var graphicsPrograms = graphics.getGraphicsPrograms(gl);
 var fftProgs = fft.getPrograms(gl);
 
 
-var map = genMap(fft, 512);
+
+function makeNewGame(mapSize){
+    var game = {};
+    game.map = genMap(fftProgs, mapSize);
+    game.pathfindView = buildNodeListView(gl, game.map.pathfindNodeInfo);
+    
+    return game;
+}
+
+
+
+
+var game = makeNewGame(256);
+
+var testObs = getObstacle(90, 90, 6);
+var testObsPosition = {x: 90, y: 90};
+addObstacle(game.map.obstacleStore, testObs);
+var testPathfinder = getPathfinder(game.map.pathfindNodeInfo);
+
+var pathfindStart = {x: 128.7, y: 128.3};
+var pathfindEnd = {x: 0, y: 0};
+var path = [];
+
 var currentMousePos = {x: 0, y: 0};
 
-var startTime = null;
+var lastTime = 0;
+var timeAcc = 0;
 var showPassable = false;
-var view = {xOffset: 0, yOffset: 0}
+var showPathfind = false;
+var view = {xOffset: 0, yOffset: 0, worldWidth: game.map.width, worldHeight: game.map.height}
+
+centerView(view, pathfindStart);
+screen.onResize.push(fixViewOnResize);
+
+function fixViewOnResize() {
+    enforceBounds(view);
+}
 
 function onMouseDown() {
 }
 
 function onMouseMove(e) {
-	currentMousePos = getMousePosition(e, canvas);
+	currentMousePos = getMousePosition(e, screen.canvas);
 }
 
 function onKeyDown(args) {
-    var SCROLL_RATE = 4;
     switch(args.keyCode) {
         case KeyCodeEnum.LEFT:
-            view.xOffset -= SCROLL_RATE;
+            moveView(view, {x: -SCROLL_RATE, y: 0});
             break;
         case KeyCodeEnum.RIGHT:
-            view.xOffset += SCROLL_RATE;
+            moveView(view, {x:  SCROLL_RATE, y: 0});
             break;
         case KeyCodeEnum.UP:
-            view.yOffset += SCROLL_RATE;
+            moveView(view, {x: 0, y: SCROLL_RATE});
             break;
         case KeyCodeEnum.DOWN:
-            view.yOffset -= SCROLL_RATE;
+            moveView(view, {x: 0, y: -SCROLL_RATE});
             break;
             
-        case KeyCodeEnum.P:
+        case KeyCodeEnum.M:
             showPassable = !showPassable;
+            break;
+        case KeyCodeEnum.P:
+            showPathfind = !showPathfind;
             break;
         
     }
+    
+    
 }
 
-canvas.addEventListener("mousedown", onMouseDown, false);
-canvas.addEventListener("mousemove", onMouseMove, false);
+screen.canvas.addEventListener("mousedown", onMouseDown, false);
+screen.canvas.addEventListener("mousemove", onMouseMove, false);
 document.onkeydown = onKeyDown;
+
+function drawMapElements(graphicsPrograms, game, view, timeDiff) {
+    var scissorBoxDims = graphicsPrograms.gl.getParameter(graphicsPrograms.gl.SCISSOR_BOX);
+    
+    graphicsPrograms.gl.scissor(screen.sideBarRight, screen.bottom, screen.right - screen.sideBarRight, screen.top - screen.bottom);
+    
+    drawMap(graphicsPrograms, game.map.terrainGraphics, timeDiff, view);
+    
+    if(showPassable) {
+        drawPassablityMap(graphicsPrograms, game.map.passabilityMap, view);
+    }
+    
+    if(showPathfind) {
+        drawNodeListView(graphicsPrograms, game.pathfindView, view);
+    }
+    drawObstacleStore(graphicsPrograms, game.map.obstacleStore, view);
+    
+    
+    
+    
+    for(var i = 0; i < path.length - 1; i++) {
+        var p1 = convertToScreen(path[i], view);
+        var p2 = convertToScreen(path[i + 1], view);
+    
+        var color = testPathfinder.finished ? [1,1,0,1] : [1,0,0,1];
+        graphics.drawLine(graphicsPrograms, p1.x, p1.y, p2.x, p2.y, color);
+    }
+    
+    
+    graphicsPrograms.gl.scissor(scissorBoxDims[0], scissorBoxDims[1], scissorBoxDims[2], scissorBoxDims[3]);
+}
 
 
 function frame(timestamp) {
-    if (!startTime) 
-        startTime = timestamp;
+    var timeDiff = timestamp - lastTime;
+    lastTime = timestamp;
     
-    var timeDiff = timestamp - startTime;
-    
-      
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    
-    gl.useProgram(spriteProgramInfo.program);
-    gl.viewport(0, 0, WIDTH, HEIGHT);
-    gl.uniform2f(spriteProgramInfo.u_resolution, WIDTH, HEIGHT);
-    
-    drawMap(gl, map, timeDiff, view, {showPassable: showPassable});
-    
-    
-    
-    function test(a, b) {
-        var pos1 = convertToScreen(a, view);
-        var pos2 = convertToScreen(b, view);
-    
-        drawLineBox(a, b, 2, gl, view)
-        drawLine(gl, pos1.x, pos1.y, pos2.x, pos2.y, [1,0,0,1]);
+    timeAcc += timeDiff;
+    if(timeAcc > UPDATE_PERIOD) {
+        while(timeAcc > UPDATE_PERIOD)
+            timeAcc -= UPDATE_PERIOD;
+        
+        testObsPosition.y += .1;
+        moveObstacle(game.map.obstacleStore, testObs, testObsPosition.x, testObsPosition.y);
+        
     }
     
-    var b = convertToWorld(mouseToMap(currentMousePos), view);
-    //test({x: 80.5, y: 80.5}, b);
-    test({x: Math.random() * 512, y: Math.random() * 512}, {x: Math.random() * 512, y: Math.random() * 512});
+    
+    
+      
+    graphicsPrograms.gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    graphicsPrograms.gl.enable(gl.BLEND);
+    graphicsPrograms.gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    
+    graphicsPrograms.gl.viewport(screen.left, screen.bottom, screen.right - screen.left, screen.top - screen.bottom);
+    
+    graphicsPrograms.gl.scissor(screen.left, screen.bottom, screen.right - screen.left, screen.top - screen.bottom);
+    graphicsPrograms.gl.enable(graphicsPrograms.gl.SCISSOR_TEST);
+    
+    
+    graphicsPrograms.resolution = {width: gl.drawingBufferWidth, height: gl.drawingBufferHeight};
+    
+    drawMapElements(graphicsPrograms, game, view, timeDiff);
+    
+    
+    var size = 2;
+    var a = {x: 80.5, y: 80.5};
+    
+    var b = convertToWorld(currentMousePos, view);
+    
+    if(b.x != pathfindEnd.x || b.y != pathfindEnd.y) {
+        pathfindEnd = b;
+        startNewPath(testPathfinder, game.map.pathfindNodeInfo, pathfindStart, pathfindEnd)
+    }
+    
+
+    if(!testPathfinder.finished) {
+        iteratePath(testPathfinder, game.map.pathfindNodeInfo, game.map.obstacleStore);
+    }
+    
+    path = getPath(testPathfinder, game.map.pathfindNodeInfo, game.map.obstacleStore, game.map.passabilityMap);
+
+    
+    drawMiniMap(graphicsPrograms, game.map.miniMap, view);
+    
+    
     
     requestAnimationFrame(frame);
 }

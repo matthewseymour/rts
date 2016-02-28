@@ -10,17 +10,20 @@ function getWaveTextures(fftProgs, size, period) {
     const stages = Math.ceil(Math.log(size) / Math.log(2));
     const N = 1 << stages; //the resized size
     
-    var initNoise = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer1   = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer2   = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer3   = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var initNoiseR = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var initNoiseI = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var buffer1    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var buffer2    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var buffer3    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var buffer4    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var buffer5    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var buffer6    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
     
     const yx_ratio = SUB_TILE_HEIGHT / SUB_TILE_WIDTH;
     
 
 
     //Have to scale down because the peak of the power spectrum function is high
-    fft.gaussianNoise(fftProgs, Math.floor(Math.random() * 65535), .04, buffer1);
     
     //u_1: l
     //u_2: L
@@ -41,8 +44,11 @@ function getWaveTextures(fftProgs, size, period) {
         b = a * sqrt(mag);
         `
     );
-    
-    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, initNoise, 5, 50, yx_ratio);
+    fft.gaussianNoise(fftProgs, Math.floor(Math.random() * 65535), .04, buffer1);
+    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, initNoiseR, 5, 50, yx_ratio);
+
+    fft.gaussianNoise(fftProgs, Math.floor(Math.random() * 65535), .04, buffer1);
+    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, initNoiseI, 5, 50, yx_ratio);
     
     //The angular frequency is given by w^2 = gk, so w = 2pi f = sqrt(gk). 
     //Bury the constant in g and we get f_k = sqrt(g'k)
@@ -54,7 +60,8 @@ function getWaveTextures(fftProgs, size, period) {
     //u_1: f_0
     //u_2: 2 * PI * t
     //u_3: y/x ratio
-    var noiseAtTime = fft.buildCustomProgram(fftProgs.gl, `
+    //u_4: output real or imaginary. 1 for real, 0 for imaginary
+    var noiseAtTime = fft.buildCustomProgram2(fftProgs.gl, `
 		float lightX = -.8;
 		float lightY = .6;
         float g = 0.002; //Gravitational constant
@@ -65,13 +72,16 @@ function getWaveTextures(fftProgs, size, period) {
         
         vec2 timeFac = vec2(cos(wkt), sin(wkt));
         
-        vec2 h = vec2(a.r * timeFac.r - a.g * timeFac.g, a.r * timeFac.g + a.g * timeFac.r);
+        vec2 h = vec2(a0 * timeFac.r - a1 * timeFac.g, a0 * timeFac.g + a1 * timeFac.r);
         
         //b = i k.l * a
         //k.l = k.x * lightX + k.y * lightY
-        b = vec2(-h.g * (k.x * lightX + k.y * lightY), h.r * (k.x * lightX + k.y * lightY));`
+        vec2 result = vec2(-h.g * (k.x * lightX + k.y * lightY), h.r * (k.x * lightX + k.y * lightY));
+        
+        //Output real or imaginary part:
+        b = result.r * u_4 + result.g * (1.0 - u_4);`
     );
-
+    
     //u_1 sets scaling:
     var chop = fft.buildCustomProgram(fftProgs.gl, `
     	float maxVal = .1;		
@@ -90,19 +100,20 @@ function getWaveTextures(fftProgs, size, period) {
     var colorMap = glUtils.makeSimpleTexture(colorMapSize, 3, colorMapPixels);
     
     var outputTextures = [];
-    
+
+    var fftPlan = fft.makePlan(stages, fft.FFT_DIRECTIONS.BACKWARD, Math.sqrt(N));
     for(var t = 0; t < period; t++) {
         outputTextures[t] = glUtils.makeTexture(N, N, fftProgs.gl.NEAREST, fftProgs.gl.REPEAT, null);
         var outputBuffer = glUtils.makeFrameBufferTexture(outputTextures[t]);
         
         
-        fft.runCustomProgram(fftProgs.gl, noiseAtTime, initNoise, buffer1, f_0, 2 * Math.PI * t, yx_ratio);
+        fft.runCustomProgram2(fftProgs.gl, noiseAtTime, initNoiseR, initNoiseI, buffer1, f_0, 2 * Math.PI * t, yx_ratio, 1.0);
+        fft.runCustomProgram2(fftProgs.gl, noiseAtTime, initNoiseR, initNoiseI, buffer2, f_0, 2 * Math.PI * t, yx_ratio, 0.0);
     
-        var fftPlan = fft.makePlan(stages, fft.FFT_DIRECTIONS.BACKWARD, Math.sqrt(N));
-        fft.computeFft(fftProgs, fftPlan, buffer1, buffer2, buffer3);
-    
-    
-        fft.runCustomProgram(fftProgs.gl, chop, buffer2, buffer1, 15);
+        fft.computeFft(fftProgs, fftPlan, buffer1, buffer2, buffer3, buffer4, buffer5, buffer6);
+        //Outputs are in buffers 3 and 4
+        //Use only the real part of the output
+        fft.runCustomProgram(fftProgs.gl, chop, buffer3, buffer1, 15);
     
         fft.colorMap(fftProgs, colorMap, buffer1, buffer1, buffer1, outputBuffer);
     }
@@ -117,9 +128,13 @@ function generateHeightMap(fftProgs, stages, scale) {
     var buffer1 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
     var buffer2 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
     var buffer3 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-
+    var buffer4 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var buffer5 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var buffer6 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    
 
     fft.gaussianNoise(fftProgs, Math.floor(Math.random() * 65535), 1, buffer1);
+    fft.gaussianNoise(fftProgs, Math.floor(Math.random() * 65535), 1, buffer2);
     
     var shapeNoise = fft.buildCustomProgram(fftProgs.gl, `
         float kMag = sqrt(k.x * k.x + k.y * k.y);
@@ -134,11 +149,16 @@ function generateHeightMap(fftProgs, stages, scale) {
         `
     );
 
-    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, buffer2);
+    //Buffers 3 and 4 will contain the real and imaginary parts of the noise:
+    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, buffer3);
+    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer2, buffer4);
 
     var fftPlan = fft.makePlan(stages, fft.FFT_DIRECTIONS.BACKWARD, Math.sqrt(N));
-    fft.computeFft(fftProgs, fftPlan, buffer2, buffer1, buffer3);
     
+    //Buffers 1 and 2 will get the output
+    fft.computeFft(fftProgs, fftPlan, buffer3, buffer4, buffer1, buffer2, buffer5, buffer6);
+    
+    //Discard the imaginary part of the output (buffer 2) and overwrite it:
     fft.scale(fftProgs, scale, buffer1, buffer2);
     
     return {heightMapBuffer: buffer2 };

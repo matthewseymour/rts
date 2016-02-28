@@ -13,10 +13,10 @@ varying vec2 v_texCoord;
 + packDataIncludeSource + 
 `
 void main() {
-	vec2 a = unpack(texture2D(u_image, v_texCoord));
+	float a = unpack(texture2D(u_image, v_texCoord));
     vec2 r = v_texCoord;
     vec2 k = 0.5 * sign(0.5 - r) - 0.5 + r;
-	vec2 b;
+	float b;
 `;
 
 

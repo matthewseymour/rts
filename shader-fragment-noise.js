@@ -34,8 +34,6 @@ void main() {
 	
 	x = LCG_rand(x);
     
-    float y = LCG_rand(x);
-
-	gl_FragColor = pack(vec2(x / 65535.0, y / 65535.0));
+	gl_FragColor = pack(x / 65535.0);
 }
 `;

@@ -6,7 +6,7 @@ varying vec2 v_texCoord;
 uniform float u_seed;
 uniform float u_scale;
 
-const float PI = 3.141592653589793238;
+//const float PI = 3.141592653589793238;
 `
 + packDataIncludeSource + 
 `
@@ -55,11 +55,7 @@ void main() {
         x1 += x;
     }
 
-    for(int i = 0; i < 10; i++) {
-    	x = LCG_rand(x);
-        x2 += x;
-    }
-    vec2 z = u_scale * vec2((x1 / 65535.0 - mean) / std, (x2 / 65535.0 - mean) / std);
+    float z = u_scale * (x1 / 65535.0 - mean) / std;
     
 	gl_FragColor = pack(z * u_scale);
 }

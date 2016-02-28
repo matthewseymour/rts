@@ -4,16 +4,22 @@ precision mediump float;
 uniform sampler2D u_image0;
 uniform sampler2D u_image1;
 
+uniform float u_1;
+uniform float u_2;
+uniform float u_3;
+uniform float u_4;
+
+
 varying vec2 v_texCoord;
 ` 
 + packDataIncludeSource + 
 `
 void main() {
-	vec2 a0 = unpack(texture2D(u_image0, v_texCoord));
-	vec2 a1 = unpack(texture2D(u_image1, v_texCoord));
+	float a0 = unpack(texture2D(u_image0, v_texCoord));
+	float a1 = unpack(texture2D(u_image1, v_texCoord));
     vec2 r = v_texCoord;
     vec2 k = 0.5 * sign(0.5 - r) - 0.5 + r;
-	vec2 b;
+	float b;
 `;
 
 

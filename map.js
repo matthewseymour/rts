@@ -1,6 +1,6 @@
 "use strict";
 
-const WAVE_SPEED = 40;
+const WAVE_SPEED = 60;
 const WAVE_PERIOD = 60;
 const SEA_LEVEL = 100; //Level on the heightmap (0-255) at which there is water
 const TANK_DRIVE_DEPTH = 10; //Level below sealevel where tanks can still drive
@@ -113,7 +113,7 @@ function getWaveTextures(fftProgs, size, period) {
         fft.computeFft(fftProgs, fftPlan, buffer1, buffer2, buffer3, buffer4, buffer5, buffer6);
         //Outputs are in buffers 3 and 4
         //Use only the real part of the output
-        fft.runCustomProgram(fftProgs.gl, chop, buffer3, buffer1, 15);
+        fft.runCustomProgram(fftProgs.gl, chop, buffer3, buffer1, 10);
     
         fft.colorMap(fftProgs, colorMap, buffer1, buffer1, buffer1, outputBuffer);
     }
@@ -139,12 +139,11 @@ function generateHeightMap(fftProgs, stages, scale) {
     var shapeNoise = fft.buildCustomProgram(fftProgs.gl, `
         float kMag = sqrt(k.x * k.x + k.y * k.y);
         float mag;
-        if(kMag < .0001) {
-            mag = 0.0;
+        if(kMag == 0.0) {
+            mag = 1.0;
         } else {
-            mag = 1.0 / pow(kMag * 110.0, 1.7);
+            mag = min(1.0, 1.0 / pow(kMag * 110.0, 1.7));
         }  
-        //b = (a * 2.0 - 1.0) * mag;
         b = a * mag;
         `
     );

@@ -12,7 +12,7 @@ uniform float u_numStages;
 uniform float u_stage;
 uniform float u_reduce;
 
-uniform float u_outputReal; //1 to output the real channel, 0 to output the imaginary channel
+uniform int u_outputReal; //1 to output the real channel, 0 to output the imaginary channel
 
 varying vec2 v_texCoord;
 
@@ -36,6 +36,10 @@ void main() {
 	
 	vec2 outVal = (even + multiplyComplex(twiddle, odd)) / u_reduce;
 	
-	gl_FragColor = pack(outVal.x * u_outputReal + outVal.y * (1.0 - u_outputReal));
+    if(u_outputReal == 1) {
+        gl_FragColor = pack(outVal.x);
+    } else {
+        gl_FragColor = pack(outVal.y);
+    }
 }
 `;

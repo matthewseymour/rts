@@ -97,16 +97,47 @@ fft.buildCustomProgram2 = function(gl, code) {
     return programInfo;
 }
 
-fft.packNumber = function(x) { //range [-1, 1.00003...]
-    var xScaled = Math.round(x * 32767) + 32767;
-    return [Math.floor(xScaled / 256), xScaled % 256, 0, 0];
+fft.packNumber = function(value) {
+    const b = 256.0;
+    
+    //Being slightly conservative with these, they'd round off anyway:
+    const maxVal = 32767.0; 
+    const minVal = -32767.0;
+    
+    var sign = value >= 0 ? 1 : 0;
+    var v = Math.min(Math.abs(value), maxVal);
+    
+    v = v / b;
+    var x = [];
+    x[0] = Math.floor(v);
+    v = (v - x[0]) * b;
+    x[1] = Math.floor(v);
+    v = (v - x[1]) * b;
+    x[2] = Math.floor(v);
+    v = (v - x[2]) * b;
+    x[3] = Math.floor(v);
+    
+    x[0] += sign * 128.0;
+    
+    return x;
 }
 
-fft.unpackNumber = function(v) { //range [(0, 0), (255, 255)]
-    var x = v[0] * 256 + v[1];   //Range [0, 65535]
+fft.unpackNumber = function(x) {
+    const b = 256.0;
     
-    return (x - 32767) / 32767; //Range [-1, 1.00003...]
+    //Record the sign and remove it from x.x:
+    var sign = (2.0 * Math.floor(x[0] / 128.0) - 1.0);
+    var x0 = x[0] % 128.0;
+    
+    var v;
+    v = x[3];
+    v = v/b + x[2];
+    v = v/b + x[1];
+    v = v/b + x0;
+    
+    return sign * v * b;
 }
+
 
 fft.makePlan = function(stages, direction, reduce) {
     var N = 1 << stages;

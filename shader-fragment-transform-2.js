@@ -1,5 +1,5 @@
 var transform2FragmentSource1 = `
-precision mediump float;
+precision highp float;
 
 uniform sampler2D u_image0;
 uniform sampler2D u_image1;
@@ -11,19 +11,17 @@ uniform float u_4;
 
 
 varying vec2 v_texCoord;
-` 
-+ packDataIncludeSource + 
-`
+
 void main() {
-	float a0 = unpack(texture2D(u_image0, v_texCoord));
-	float a1 = unpack(texture2D(u_image1, v_texCoord));
+	vec4 a0 = texture2D(u_image0, v_texCoord);
+	vec4 a1 = texture2D(u_image1, v_texCoord);
     vec2 r = v_texCoord;
     vec2 k = 0.5 * sign(0.5 - r) - 0.5 + r;
-	float b;
+	vec4 b;
 `;
 
 
 var transform2FragmentSource2 = `
-	gl_FragColor = pack(b);
+	gl_FragColor = b;
 }
 `;

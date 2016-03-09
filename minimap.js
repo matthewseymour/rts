@@ -1,7 +1,8 @@
 "use strict";
 
 function getMiniMap(graphicsPrograms, terrainGraphcs) {
-    var miniMapBuffer = glUtils.makeFrameBuffer(MINI_MAP_SIZE, MINI_MAP_SIZE, gl.NEAREST);
+    var gl = graphicsPrograms.gl;
+    var miniMapBuffer = glUtils.makeFrameBuffer(gl, MINI_MAP_SIZE, MINI_MAP_SIZE, gl.NEAREST);
     
     
     graphicsPrograms.gl.bindFramebuffer(gl.FRAMEBUFFER, miniMapBuffer.frameBuffer);

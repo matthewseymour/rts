@@ -10,14 +10,10 @@ function getWaveTextures(fftProgs, size, period) {
     const stages = Math.ceil(Math.log(size) / Math.log(2));
     const N = 1 << stages; //the resized size
     
-    var initNoiseR = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var initNoiseI = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer1    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer2    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer3    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer4    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer5    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer6    = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var initNoise  = fft.makeComputeBuffer(fftProgs.gl, N, N);
+    var buffer1    = fft.makeComputeBuffer(fftProgs.gl, N, N);
+    var buffer2    = fft.makeComputeBuffer(fftProgs.gl, N, N);
+    var buffer3    = fft.makeComputeBuffer(fftProgs.gl, N, N);
     
     const yx_ratio = SUB_TILE_HEIGHT / SUB_TILE_WIDTH;
     
@@ -45,11 +41,8 @@ function getWaveTextures(fftProgs, size, period) {
         `
     );
     fft.gaussianNoise(fftProgs, Math.floor(Math.random() * 65535), .04, buffer1);
-    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, initNoiseR, 5, 50, yx_ratio);
+    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, initNoise, 5, 50, yx_ratio);
 
-    fft.gaussianNoise(fftProgs, Math.floor(Math.random() * 65535), .04, buffer1);
-    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, initNoiseI, 5, 50, yx_ratio);
-    
     //The angular frequency is given by w^2 = gk, so w = 2pi f = sqrt(gk). 
     //Bury the constant in g and we get f_k = sqrt(g'k)
     //f_k must be an integer multiple of a fundamental frequency f_0, or the animation won't loop correctly. 
@@ -60,8 +53,7 @@ function getWaveTextures(fftProgs, size, period) {
     //u_1: f_0
     //u_2: 2 * PI * t
     //u_3: y/x ratio
-    //u_4: output real or imaginary. 1 for real, 0 for imaginary
-    var noiseAtTime = fft.buildCustomProgram2(fftProgs.gl, `
+    var noiseAtTime = fft.buildCustomProgram(fftProgs.gl, `
 		float lightX = -.8;
 		float lightY = .6;
         float g = 0.002; //Gravitational constant
@@ -72,50 +64,46 @@ function getWaveTextures(fftProgs, size, period) {
         
         vec2 timeFac = vec2(cos(wkt), sin(wkt));
         
-        vec2 h = vec2(a0 * timeFac.r - a1 * timeFac.g, a0 * timeFac.g + a1 * timeFac.r);
+        vec2 h = vec2(a.r * timeFac.r - a.g * timeFac.g, a.r * timeFac.g + a.g * timeFac.r);
         
         //b = i k.l * a
         //k.l = k.x * lightX + k.y * lightY
         vec2 result = vec2(-h.g * (k.x * lightX + k.y * lightY), h.r * (k.x * lightX + k.y * lightY));
         
         //Output real or imaginary part:
-        b = result.r * u_4 + result.g * (1.0 - u_4);`
+        b = vec4(result.r, result.g, 0, 0);
+        `
     );
     
     //u_1 sets scaling:
     var chop = fft.buildCustomProgram(fftProgs.gl, `
     	float maxVal = .1;		
     	float minVal = -.01;
-        b = min(max((a * u_1 - minVal) / (maxVal - minVal), 0.0), 1.0) * 2.0 - 1.0;
+        vec4 scaled = (a * u_1 - vec4(minVal)) / (maxVal - minVal);
+        b = clamp(scaled, 0.0, 1.0);
+        `
+    );
+
+    var colorMap = fft.buildCustomProgram(fftProgs.gl, `
+        b = vec4(1.0, 1.0, 1.0, 0.5 * a.x);
         `
     );
     
-    const colorMapSize = 255;
-    var colorMapPixels = new Uint8Array(colorMapSize * 3 * 4);
-    for(var i = 0; i < colorMapSize; i++) {
-        glUtils.setPixelValue(colorMapPixels, i, 0, colorMapSize, [255,255,255, Math.floor(i * .5)]);
-        glUtils.setPixelValue(colorMapPixels, i, 1, colorMapSize, [0  ,0  ,0  , 0]);
-        glUtils.setPixelValue(colorMapPixels, i, 2, colorMapSize, [0  ,0  ,0  , 0]);
-    }
-    var colorMap = glUtils.makeSimpleTexture(colorMapSize, 3, colorMapPixels);
-    
     var outputTextures = [];
 
-    var fftPlan = fft.makePlan(stages, fft.FFT_DIRECTIONS.BACKWARD, Math.sqrt(N));
+    var fftPlan = fft.makePlan(fftProgs, stages, fft.FFT_DIRECTIONS.BACKWARD, Math.sqrt(N));
     for(var t = 0; t < period; t++) {
-        outputTextures[t] = glUtils.makeTexture(N, N, fftProgs.gl.NEAREST, fftProgs.gl.REPEAT, null);
-        var outputBuffer = glUtils.makeFrameBufferTexture(outputTextures[t]);
+        outputTextures[t] = glUtils.makeTexture(fftProgs.gl, N, N, fftProgs.gl.NEAREST, fftProgs.gl.REPEAT, null);
+        var outputBuffer = glUtils.makeFrameBufferTexture(fftProgs.gl, outputTextures[t]);
         
-        
-        fft.runCustomProgram2(fftProgs.gl, noiseAtTime, initNoiseR, initNoiseI, buffer1, f_0, 2 * Math.PI * t, yx_ratio, 1.0);
-        fft.runCustomProgram2(fftProgs.gl, noiseAtTime, initNoiseR, initNoiseI, buffer2, f_0, 2 * Math.PI * t, yx_ratio, 0.0);
+        fft.runCustomProgram(fftProgs.gl, noiseAtTime, initNoise, buffer1, f_0, 2 * Math.PI * t, yx_ratio);
     
-        fft.computeFft(fftProgs, fftPlan, buffer1, buffer2, buffer3, buffer4, buffer5, buffer6);
-        //Outputs are in buffers 3 and 4
-        //Use only the real part of the output
-        fft.runCustomProgram(fftProgs.gl, chop, buffer3, buffer1, 10);
+        fft.computeFft(fftProgs, fftPlan, buffer1, buffer2, buffer3);
+        //Output is in buffer 2
+
+        fft.runCustomProgram(fftProgs.gl, chop, buffer2, buffer1, 10);
     
-        fft.colorMap(fftProgs, colorMap, buffer1, buffer1, buffer1, outputBuffer);
+        fft.runCustomProgram(fftProgs.gl, colorMap, buffer1, outputBuffer);
     }
     
     return {waveTextures: outputTextures};
@@ -125,16 +113,12 @@ function getWaveTextures(fftProgs, size, period) {
 function generateHeightMap(fftProgs, stages, scale) {
     const N = 1 << stages;
     
-    var buffer1 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer2 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer3 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer4 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer5 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
-    var buffer6 = glUtils.makeFrameBuffer(N, N, fftProgs.gl.NEAREST);
+    var buffer1 = fft.makeComputeBuffer(fftProgs.gl, N, N);
+    var buffer2 = fft.makeComputeBuffer(fftProgs.gl, N, N);
+    var buffer3 = fft.makeComputeBuffer(fftProgs.gl, N, N);
     
 
     fft.gaussianNoise(fftProgs, Math.floor(Math.random() * 65535), 1, buffer1);
-    fft.gaussianNoise(fftProgs, Math.floor(Math.random() * 65535), 1, buffer2);
     
     var shapeNoise = fft.buildCustomProgram(fftProgs.gl, `
         float kMag = sqrt(k.x * k.x + k.y * k.y);
@@ -148,17 +132,21 @@ function generateHeightMap(fftProgs, stages, scale) {
         `
     );
 
-    //Buffers 3 and 4 will contain the real and imaginary parts of the noise:
-    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, buffer3);
-    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer2, buffer4);
+    fft.runCustomProgram(fftProgs.gl, shapeNoise, buffer1, buffer2);
 
-    var fftPlan = fft.makePlan(stages, fft.FFT_DIRECTIONS.BACKWARD, Math.sqrt(N));
+    var fftPlan = fft.makePlan(fftProgs, stages, fft.FFT_DIRECTIONS.BACKWARD, Math.sqrt(N));
     
-    //Buffers 1 and 2 will get the output
-    fft.computeFft(fftProgs, fftPlan, buffer3, buffer4, buffer1, buffer2, buffer5, buffer6);
+    //Buffer 1 will get the output
+    fft.computeFft(fftProgs, fftPlan, buffer2, buffer1, buffer3);
     
-    //Discard the imaginary part of the output (buffer 2) and overwrite it:
-    fft.scale(fftProgs, scale, buffer1, buffer2);
+    //u_1 is the scaling factor:
+    var rescale = fft.buildCustomProgram(fftProgs.gl, `
+        b = vec4((a.x * u_1 + 1.0) / 2.0, 0.0, 0.0, 0.0);
+        `
+    );
+    fft.runCustomProgram(fftProgs.gl, rescale, buffer1, buffer2, scale);
+    //fft.scale(fftProgs, scale, buffer1, buffer2);
+    
     
     return {heightMapBuffer: buffer2 };
 }
@@ -229,20 +217,18 @@ function getMapBackgroundGrass(value) {
 
 function genPassableMap(heightMap, width, height, gl) {
     const colorMapSize = 255;
-    var colorMapPassablePixels = new Uint8Array(colorMapSize * 3 * 4);
+    var colorMapPassablePixels = new Uint8Array(colorMapSize * 4 * 4);
     for(var i = 0; i < colorMapSize; i++) {
         //Put the "standard passibility" in the red channel, and the tank passibility (tanks can drive in shallow water) in the blue channel. Also put the "standard passibility" in the alpha channel so we can draw this easily for debugging purposes.
         var pass = (i >= SEA_LEVEL ? 0 : 255);
         var tankPass = (i >= SEA_LEVEL - TANK_DRIVE_DEPTH ? 0 : 255);
         glUtils.setPixelValue(colorMapPassablePixels, i, 0, colorMapSize, [pass, 0, tankPass, pass]);
-        glUtils.setPixelValue(colorMapPassablePixels, i, 1, colorMapSize, [0, 0, 0, 0]);
-        glUtils.setPixelValue(colorMapPassablePixels, i, 2, colorMapSize, [0, 0, 0, 0]);
     }
     
-    var colorMapPassable = glUtils.makeSimpleTexture(colorMapSize, 3, colorMapPassablePixels);
+    var colorMapPassable = glUtils.makeSimpleTexture(gl, colorMapSize, 4, colorMapPassablePixels);
     
-    var passableBuffer = glUtils.makeFrameBuffer(width, height, gl.NEAREST);
-    fft.colorMap(fftProgs, colorMapPassable, heightMap.heightMapBuffer, heightMap.heightMapBuffer, heightMap.heightMapBuffer, passableBuffer);
+    var passableBuffer = glUtils.makeFrameBuffer(gl, width, height, gl.NEAREST);
+    fft.colorMap(fftProgs, colorMapPassable, heightMap.heightMapBuffer, passableBuffer);
 
     var passableBufferPixels = new Uint8Array(width * height * 4);
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, passableBufferPixels);
@@ -309,61 +295,63 @@ function getObstacleDistanceMap(passibilityMap, width, height) {
 
 function genMapTerrainGraphics(fftProgs, heightMap, width, height) {
     const colorMapSize = 255;
-    var colorMapLandPixels     = new Uint8Array(colorMapSize * 3 * 4);
-    var colorMapWaterPixels    = new Uint8Array(colorMapSize * 3 * 4);
-    var colorMapLandMaskPixels = new Uint8Array(colorMapSize * 3 * 4);
+    var colorMapLandPixels     = new Uint8Array(colorMapSize * 4 * 4);
+    var colorMapWaterPixels    = new Uint8Array(colorMapSize * 4 * 4);
+    var colorMapLandMaskPixels = new Uint8Array(colorMapSize * 4 * 4);
     
     for(var i = 0; i < colorMapSize; i++) {
         var colorValues = getMapBackgroundGrass(i);
         glUtils.setPixelValue(colorMapLandPixels, i, 0, colorMapSize, colorValues.land);
-        //glUtils.setPixelValue(colorMapLandPixels, i, 1, colorMapSize, [i / 7, i / 7, i / 7, 255]);
-        glUtils.setPixelValue(colorMapLandPixels, i, 1, colorMapSize, [0,0,0, 255]);
-        glUtils.setPixelValue(colorMapLandPixels, i, 2, colorMapSize, [(25 / 255) * i, (25 / 255) * i, (25 / 255) * i, 255]);
+        glUtils.setPixelValue(colorMapLandPixels, i, 1, colorMapSize, [(25 / 255) * i, (25 / 255) * i, (25 / 255) * i, 255]);
 
         glUtils.setPixelValue(colorMapWaterPixels, i, 0, colorMapSize,    colorValues.water);
-        glUtils.setPixelValue(colorMapWaterPixels, i, 1, colorMapSize,    [0,0,0,0]);
-        glUtils.setPixelValue(colorMapWaterPixels, i, 2, colorMapSize,    [0,0,0,0]);
         
         glUtils.setPixelValue(colorMapLandMaskPixels, i, 0, colorMapSize, colorValues.landMask);
-        glUtils.setPixelValue(colorMapLandMaskPixels, i, 1, colorMapSize, [0,0,0,0]);
-        glUtils.setPixelValue(colorMapLandMaskPixels, i, 2, colorMapSize, [0,0,0,0]);
         
         
     }
     
     
-    var colorMapLand     = glUtils.makeSimpleTexture(colorMapSize, 3, colorMapLandPixels    );
-    var colorMapWater    = glUtils.makeSimpleTexture(colorMapSize, 3, colorMapWaterPixels   );
-    var colorMapLandMask = glUtils.makeSimpleTexture(colorMapSize, 3, colorMapLandMaskPixels);
+    var colorMapLand     = glUtils.makeSimpleTexture(fftProgs.gl, colorMapSize, 4, colorMapLandPixels    );
+    var colorMapWater    = glUtils.makeSimpleTexture(fftProgs.gl, colorMapSize, 4, colorMapWaterPixels   );
+    var colorMapLandMask = glUtils.makeSimpleTexture(fftProgs.gl, colorMapSize, 4, colorMapLandMaskPixels);
     
 
-    var finalLargeHeightBuffer   = glUtils.makeFrameBuffer(width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT, fftProgs.gl.NEAREST);
-    var finalLargeGradBuffer     = glUtils.makeFrameBuffer(width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT, fftProgs.gl.NEAREST);
-    var finalLargeNoiseBuffer    = glUtils.makeFrameBuffer(width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT, fftProgs.gl.NEAREST);
-    var finalLargeTempBuffer     = glUtils.makeFrameBuffer(width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT, fftProgs.gl.NEAREST);
-    var finalLargeWaterBuffer    = glUtils.makeFrameBuffer(width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT, fftProgs.gl.NEAREST);
-    var finalLargeLandMaskBuffer = glUtils.makeFrameBuffer(width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT, fftProgs.gl.NEAREST);
-
-    fft.bicubic(fftProgs, heightMap.heightMapBuffer, finalLargeHeightBuffer);
+    var largeHeightBuffer   = fft.makeComputeBuffer(fftProgs.gl, width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT);
+    var largeTempBuffer     = fft.makeComputeBuffer(fftProgs.gl, width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT);
+    var largeNoiseBuffer    = fft.makeComputeBuffer(fftProgs.gl, width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT);
     
-    fft.gradient(fftProgs, [15, -20], 4, finalLargeHeightBuffer, finalLargeGradBuffer);
+    var largeLandBuffer     = glUtils.makeFrameBuffer(fftProgs.gl, width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT, fftProgs.gl.NEAREST);
+    var largeWaterBuffer    = glUtils.makeFrameBuffer(fftProgs.gl, width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT, fftProgs.gl.NEAREST);
+    var largeLandMaskBuffer = glUtils.makeFrameBuffer(fftProgs.gl, width * SUB_TILE_WIDTH, height * SUB_TILE_HEIGHT, fftProgs.gl.NEAREST);
+
+    fft.bicubic(fftProgs, heightMap.heightMapBuffer, largeTempBuffer);
+    
+    //fft.gradient(fftProgs, [15, -20], 4, finalLargeHeightBuffer, finalLargeGradBuffer);
     //fft.gradient(fftProgs, [SUB_TILE_WIDTH * 2, -SUB_TILE_HEIGHT * 3], 4, finalLargeHeightBuffer, finalLargeGradBuffer);
     
-    fft.noise(fftProgs, Math.floor(Math.random() * 65535), finalLargeNoiseBuffer);
+    fft.noise(fftProgs, Math.floor(Math.random() * 65535), largeNoiseBuffer);
+    
+    
+    var addNoiseToHeight = fft.buildCustomProgram2(fftProgs.gl, `
+        b = vec4(a0.x, a1.y, 0, 0);
+        `
+    );
+    fft.runCustomProgram2(fftProgs.gl, addNoiseToHeight, largeTempBuffer, largeNoiseBuffer, largeHeightBuffer);
     
 
-    fft.colorMap(fftProgs, colorMapLand, finalLargeHeightBuffer, finalLargeGradBuffer, finalLargeNoiseBuffer, finalLargeTempBuffer);
+    fft.colorMap(fftProgs, colorMapLand    , largeHeightBuffer, largeLandBuffer);
 
-    fft.colorMap(fftProgs, colorMapWater, finalLargeHeightBuffer, finalLargeHeightBuffer, finalLargeHeightBuffer, finalLargeWaterBuffer);
+    fft.colorMap(fftProgs, colorMapWater   , largeHeightBuffer, largeWaterBuffer);
 
-    fft.colorMap(fftProgs, colorMapLandMask, finalLargeHeightBuffer, finalLargeHeightBuffer, finalLargeHeightBuffer, finalLargeLandMaskBuffer);
+    fft.colorMap(fftProgs, colorMapLandMask, largeHeightBuffer, largeLandMaskBuffer);
     
     var waves = getWaveTextures(fftProgs, 512, WAVE_PERIOD);
     
     return {
-        landBuffer: finalLargeTempBuffer,
-        waterBuffer: finalLargeWaterBuffer,
-        landMaskBuffer: finalLargeLandMaskBuffer,
+        landBuffer: largeLandBuffer,
+        waterBuffer: largeWaterBuffer,
+        landMaskBuffer: largeLandMaskBuffer,
         waves: waves,
         waveTime: 0
     };

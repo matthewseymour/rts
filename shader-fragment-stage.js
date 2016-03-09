@@ -1,45 +1,35 @@
 var stageFragmentSource = `
-precision mediump float;
+precision highp float;
 
-uniform sampler2D u_image_r;
-uniform sampler2D u_image_i;
-uniform sampler2D u_twiddles_r;
-uniform sampler2D u_twiddles_i;
-uniform sampler2D u_read;
+uniform sampler2D u_image;
+uniform sampler2D u_twiddleRead;
 
 uniform float u_n;
 uniform float u_numStages;
 uniform float u_stage;
 uniform float u_reduce;
 
-uniform int u_outputReal; //1 to output the real channel, 0 to output the imaginary channel
-
 varying vec2 v_texCoord;
 
-` 
-+ packDataIncludeSource + 
-`
+//To do: Move to an include so that the custom programs can use it:
+vec2 multiplyComplex(vec2 a, vec2 b) {
+	return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
 
 void main() {
 	vec2 readPosControl = vec2(v_texCoord.x, u_stage / u_numStages);
 	
-	vec2 twiddle = vec2(unpack(texture2D(u_twiddles_r, readPosControl)), unpack(texture2D(u_twiddles_i, readPosControl)));
+    vec2 twiddle = texture2D(u_twiddleRead, readPosControl).xy;
 	
-	vec2 readEvenPacked = texture2D(u_read, readPosControl).xy;
-	vec2 readOddPacked  = texture2D(u_read, readPosControl).zw;
+	vec2 readEven = vec2(texture2D(u_twiddleRead, readPosControl).z / u_n, v_texCoord.y);
+	vec2 readOdd  = vec2(texture2D(u_twiddleRead, readPosControl).w / u_n, v_texCoord.y);
 	
-	vec2 readEven = vec2(unpack2Bytes(readEvenPacked) / u_n, v_texCoord.y);
-	vec2 readOdd  = vec2(unpack2Bytes(readOddPacked)  / u_n, v_texCoord.y);
-	
-	vec2 even = vec2(unpack(texture2D(u_image_r, readEven)), unpack(texture2D(u_image_i, readEven)) );
-	vec2 odd  = vec2(unpack(texture2D(u_image_r, readOdd )), unpack(texture2D(u_image_i, readOdd )) );
-	
+	vec2 even = texture2D(u_image, readEven).xy;
+	vec2 odd  = texture2D(u_image, readOdd ).xy;
+
 	vec2 outVal = (even + multiplyComplex(twiddle, odd)) / u_reduce;
 	
-    if(u_outputReal == 1) {
-        gl_FragColor = pack(outVal.x);
-    } else {
-        gl_FragColor = pack(outVal.y);
-    }
+    gl_FragColor = vec4(outVal.x, outVal.y, 0, 1.0);
 }
 `;

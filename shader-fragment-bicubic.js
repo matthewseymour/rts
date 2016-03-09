@@ -1,15 +1,12 @@
 var bicubicFragmentSource = `
-precision mediump float;
+precision highp float;
 
 uniform sampler2D u_image;
 uniform vec2 u_size;
 
 varying vec2 v_texCoord;
-`
-+ packDataIncludeSource + 
-`
 
-float cubicInterpolator(float p0, float p1, float p2, float p3, float x) {
+vec4 cubicInterpolator(vec4 p0, vec4 p1, vec4 p2, vec4 p3, float x) {
 	return p1 + 0.5 * x * (p2 - p0 + x * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3 + x * (3.0 * (p1 - p2) + p3 - p0)));
 }
 
@@ -20,36 +17,36 @@ void main() {
     
     
     //Read 4x4 grid of points:
-    float p00 = unpack(texture2D(u_image, (texCoord + vec2(-1.0, -1.0)) / u_size));
-    float p01 = unpack(texture2D(u_image, (texCoord + vec2( 0.0, -1.0)) / u_size));
-    float p02 = unpack(texture2D(u_image, (texCoord + vec2( 1.0, -1.0)) / u_size));
-    float p03 = unpack(texture2D(u_image, (texCoord + vec2( 2.0, -1.0)) / u_size));
-    
-    float p10 = unpack(texture2D(u_image, (texCoord + vec2(-1.0,  0.0)) / u_size));
-    float p11 = unpack(texture2D(u_image, (texCoord + vec2( 0.0,  0.0)) / u_size));
-    float p12 = unpack(texture2D(u_image, (texCoord + vec2( 1.0,  0.0)) / u_size));
-    float p13 = unpack(texture2D(u_image, (texCoord + vec2( 2.0,  0.0)) / u_size));
-    
-    float p20 = unpack(texture2D(u_image, (texCoord + vec2(-1.0,  1.0)) / u_size));
-    float p21 = unpack(texture2D(u_image, (texCoord + vec2( 0.0,  1.0)) / u_size));
-    float p22 = unpack(texture2D(u_image, (texCoord + vec2( 1.0,  1.0)) / u_size));
-    float p23 = unpack(texture2D(u_image, (texCoord + vec2( 2.0,  1.0)) / u_size));
-    
-    float p30 = unpack(texture2D(u_image, (texCoord + vec2(-1.0,  2.0)) / u_size));
-    float p31 = unpack(texture2D(u_image, (texCoord + vec2( 0.0,  2.0)) / u_size));
-    float p32 = unpack(texture2D(u_image, (texCoord + vec2( 1.0,  2.0)) / u_size));
-    float p33 = unpack(texture2D(u_image, (texCoord + vec2( 2.0,  2.0)) / u_size));
+    vec4 p00 = texture2D(u_image, (texCoord + vec2(-1.0, -1.0)) / u_size);
+    vec4 p01 = texture2D(u_image, (texCoord + vec2( 0.0, -1.0)) / u_size);
+    vec4 p02 = texture2D(u_image, (texCoord + vec2( 1.0, -1.0)) / u_size);
+    vec4 p03 = texture2D(u_image, (texCoord + vec2( 2.0, -1.0)) / u_size);
+
+    vec4 p10 = texture2D(u_image, (texCoord + vec2(-1.0,  0.0)) / u_size);
+    vec4 p11 = texture2D(u_image, (texCoord + vec2( 0.0,  0.0)) / u_size);
+    vec4 p12 = texture2D(u_image, (texCoord + vec2( 1.0,  0.0)) / u_size);
+    vec4 p13 = texture2D(u_image, (texCoord + vec2( 2.0,  0.0)) / u_size);
+
+    vec4 p20 = texture2D(u_image, (texCoord + vec2(-1.0,  1.0)) / u_size);
+    vec4 p21 = texture2D(u_image, (texCoord + vec2( 0.0,  1.0)) / u_size);
+    vec4 p22 = texture2D(u_image, (texCoord + vec2( 1.0,  1.0)) / u_size);
+    vec4 p23 = texture2D(u_image, (texCoord + vec2( 2.0,  1.0)) / u_size);
+
+    vec4 p30 = texture2D(u_image, (texCoord + vec2(-1.0,  2.0)) / u_size);
+    vec4 p31 = texture2D(u_image, (texCoord + vec2( 0.0,  2.0)) / u_size);
+    vec4 p32 = texture2D(u_image, (texCoord + vec2( 1.0,  2.0)) / u_size);
+    vec4 p33 = texture2D(u_image, (texCoord + vec2( 2.0,  2.0)) / u_size);
   
     //Interpolate along each row:
-    float p0 = cubicInterpolator(p00, p01, p02, p03, position.x);
-    float p1 = cubicInterpolator(p10, p11, p12, p13, position.x);
-    float p2 = cubicInterpolator(p20, p21, p22, p23, position.x);
-    float p3 = cubicInterpolator(p30, p31, p32, p33, position.x);
+    vec4 p0 = cubicInterpolator(p00, p01, p02, p03, position.x);
+    vec4 p1 = cubicInterpolator(p10, p11, p12, p13, position.x);
+    vec4 p2 = cubicInterpolator(p20, p21, p22, p23, position.x);
+    vec4 p3 = cubicInterpolator(p30, p31, p32, p33, position.x);
     
     //Interpolate vertically:
-    float val = cubicInterpolator(p0, p1, p2, p3, position.y);
+    vec4 val = cubicInterpolator(p0, p1, p2, p3, position.y);
     
     //Pack and output:   
-    gl_FragColor = pack(val);
+    gl_FragColor = val;
 }
 `;

@@ -1,17 +1,16 @@
 var scaleFragmentSource = `
-precision mediump float;
+precision highp float;
 
 uniform sampler2D u_image;
 
 uniform float u_scale;
 
 varying vec2 v_texCoord;
-` 
-+ packDataIncludeSource + 
-`
+
+
 void main() {
-	float inputValue = unpack(texture2D(u_image, v_texCoord));
+	vec4 inputValue = texture2D(u_image, v_texCoord);
 	
-	gl_FragColor = pack(inputValue * u_scale);
+	gl_FragColor = inputValue * u_scale;
 }
 `;

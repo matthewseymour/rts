@@ -18,6 +18,13 @@ var gl = screen.canvas.getContext("experimental-webgl",
     antialias: true
 });
 
+var floatTextureExtension = gl.getExtension("OES_texture_float");
+if (!floatTextureExtension) {
+    alert("float textures not supported");
+}
+
+
+
 function changeScissorDims() {
     graphicsPrograms.gl.scissor(screen.left, screen.bottom, screen.right - screen.left, screen.top - screen.bottom);
 }

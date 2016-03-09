@@ -1,5 +1,5 @@
 var noiseFragmentSource = `
-precision mediump float;
+precision highp float;
 
 varying vec2 v_texCoord;
 
@@ -14,13 +14,6 @@ float LCG_rand(float prev) {
 	return mod(9821.0 * prev + 6925.0, 65535.0);
 }
 
-/*
-float LCG_rand2(float prev) {
-	//x[n] = ((1217 * x[n-1]) + 0) mod 32767
-	return mod(1217.0 * prev, 32767.0);
-}
-*/
-
 void main() {
 	//float x = (v_texCoord.x) * 256.0 + (v_texCoord.y) * 65536.0; //Range (0, 65536)
     float x = mod(unpack2Bytes(v_texCoord) + u_seed, 65536.0);
@@ -32,8 +25,12 @@ void main() {
 	x = LCG_rand(x);
 	x = LCG_rand(x);
 	
-	x = LCG_rand(x);
+	float z1 = LCG_rand(x);
+	float z2 = LCG_rand(z1);
+	float z3 = LCG_rand(z2);
+	float z4 = LCG_rand(z3);
     
-	gl_FragColor = pack(x / 65535.0);
+    
+	gl_FragColor = vec4(z1, z2, z3, z4) / 65535.0;
 }
 `;

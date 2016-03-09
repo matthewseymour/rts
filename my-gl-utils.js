@@ -19,10 +19,8 @@ glUtils.generateSimpleUnitRectangleBuffer = function(gl) {
 			0.0, 0.0,
 			1.0, 0.0,
 			0.0, 1.0,
-			0.0, 1.0,
-			1.0, 0.0,
 			1.0, 1.0]),
-		gl.STATIC_DRAW);	
+		gl.STATIC_DRAW);
     return spriteVertexBuffer;
 }
 
@@ -63,12 +61,8 @@ glUtils.makeProgram = function(gl, vertexShaderSource, fragmentShaderSource, att
     return info;
 }
 
-glUtils.makeSimpleTexture = function(width, height, data) {
-    return glUtils.makeTexture(width, height, gl.NEAREST, gl.CLAMP_TO_EDGE, data);
-}
 
-
-glUtils.makeTexture = function(width, height, filterType, wrapType, data) {
+glUtils.makeTextureGeneric = function(gl, width, height, type, filterType, wrapType, data) {
 	var texture = gl.createTexture();
 	
     gl.activeTexture(gl.TEXTURE0); 
@@ -79,15 +73,21 @@ glUtils.makeTexture = function(width, height, filterType, wrapType, data) {
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filterType);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filterType);
     
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
-	
-	gl.bindTexture(gl.TEXTURE_2D, null);
-	
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, type, data);
+
     return {texture: texture, width: width, height: height};
 }
 
+glUtils.makeSimpleTexture = function(gl, width, height, data) {
+    return glUtils.makeTextureGeneric(gl, width, height, gl.UNSIGNED_BYTE, gl.NEAREST, gl.CLAMP_TO_EDGE, data);
+}
 
-glUtils.makeFrameBufferTexture = function(textureInfo) {
+glUtils.makeTexture = function(gl, width, height, filterType, wrapType, data) {
+    return glUtils.makeTextureGeneric(gl, width, height, gl.UNSIGNED_BYTE, filterType, wrapType, data);
+}
+
+
+glUtils.makeFrameBufferTexture = function(gl, textureInfo) {
     var fbTexture = textureInfo.texture;
     
 	var framebuffer = gl.createFramebuffer();
@@ -101,10 +101,10 @@ glUtils.makeFrameBufferTexture = function(textureInfo) {
 }
 
 //filterType: gl.NEAREST or gl.LINEAR
-glUtils.makeFrameBuffer = function(width, height, filterType) {
-    var textureInfo = glUtils.makeTexture(width, height, filterType, gl.CLAMP_TO_EDGE, null);
+glUtils.makeFrameBuffer = function(gl, width, height, filterType) {
+    var textureInfo = glUtils.makeTexture(gl, width, height, filterType, gl.CLAMP_TO_EDGE, null);
 	
-    return glUtils.makeFrameBufferTexture(textureInfo);
+    return glUtils.makeFrameBufferTexture(gl, textureInfo);
 }
 
 glUtils.deleteFrameBuffer = function(buffer) {

@@ -14,6 +14,7 @@ fft.getPrograms = function(gl) {
     
     fftProgs.unitRectBuffer = glUtils.generateSimpleUnitRectangleBuffer(gl);
     
+    
 
     
     fftProgs.transformProgramInfo = glUtils.makeProgram(
@@ -37,7 +38,7 @@ fft.getPrograms = function(gl) {
     fftProgs.stageProgramInfo = glUtils.makeProgram(
         gl, fftVertexSource, stageFragmentSource, 
         ["a_position", "a_texCoord"], 
-        ["u_image_r", "u_image_i", "u_twiddles_r", "u_twiddles_i", "u_read", "u_numStages", "u_n", "u_stage", "u_reduce", "u_outputReal"]
+        ["u_image", "u_twiddleRead", "u_numStages", "u_n", "u_stage", "u_reduce"]
     );
 
     fftProgs.colorMapProgramInfo = glUtils.makeProgram(
@@ -75,6 +76,17 @@ fft.getPrograms = function(gl) {
     return fftProgs;
 }
 
+fft.makeComputeBuffer = function(gl, width, height) {
+    var textureInfo = glUtils.makeTextureGeneric(gl, width, height, gl.FLOAT, gl.NEAREST, gl.CLAMP_TO_EDGE, null);
+
+    var framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, textureInfo.texture, 0);
+    
+    return {width: width, height: height, texture: textureInfo.texture, frameBuffer: framebuffer};
+}
+
 fft.buildCustomProgram = function(gl, code) {
     var fragmentSource = transformFragmentSource1 + code + transformFragmentSource2;
     var programInfo = glUtils.makeProgram(
@@ -97,49 +109,9 @@ fft.buildCustomProgram2 = function(gl, code) {
     return programInfo;
 }
 
-fft.packNumber = function(value) {
-    const b = 256.0;
-    
-    //Being slightly conservative with these, they'd round off anyway:
-    const maxVal = 32767.0; 
-    const minVal = -32767.0;
-    
-    var sign = value >= 0 ? 1 : 0;
-    var v = Math.min(Math.abs(value), maxVal);
-    
-    v = v / b;
-    var x = [];
-    x[0] = Math.floor(v);
-    v = (v - x[0]) * b;
-    x[1] = Math.floor(v);
-    v = (v - x[1]) * b;
-    x[2] = Math.floor(v);
-    v = (v - x[2]) * b;
-    x[3] = Math.floor(v);
-    
-    x[0] += sign * 128.0;
-    
-    return x;
-}
-
-fft.unpackNumber = function(x) {
-    const b = 256.0;
-    
-    //Record the sign and remove it from x.x:
-    var sign = (2.0 * Math.floor(x[0] / 128.0) - 1.0);
-    var x0 = x[0] % 128.0;
-    
-    var v;
-    v = x[3];
-    v = v/b + x[2];
-    v = v/b + x[1];
-    v = v/b + x0;
-    
-    return sign * v * b;
-}
 
 
-fft.makePlan = function(stages, direction, reduce) {
+fft.makePlan = function(fftProgs, stages, direction, reduce) {
     var N = 1 << stages;
     
     var reduceFactor = Math.pow(reduce, 1 / stages);
@@ -149,7 +121,7 @@ fft.makePlan = function(stages, direction, reduce) {
     }
     
     //Bit reverse N x 1
-    var imageDataBitReverse = new Uint8Array(N * 1 * 4);
+    var imageDataBitReverse = new Float32Array(N * 1 * 4);
     for(var i = 0; i < N; i++) {
         //Bit reversal:
         var k1 = 1; 
@@ -161,15 +133,13 @@ fft.makePlan = function(stages, direction, reduce) {
             k2 = k2 >> 1;
         }
     
-        imageDataBitReverse[i * 4    ] = Math.floor(j / 256);
-        imageDataBitReverse[i * 4 + 1] = j % 256;
+        imageDataBitReverse[i * 4    ] = j;
+        imageDataBitReverse[i * 4 + 1] = 0;
         imageDataBitReverse[i * 4 + 2] = 0;
         imageDataBitReverse[i * 4 + 3] = 0;
     }
 
-    var imageDataTwiddleR = new Uint8Array(N * stages * 4);
-    var imageDataTwiddleI = new Uint8Array(N * stages * 4);
-    var imageDataRead = new Uint8Array(N * stages * 4);
+    var imageDataTwiddleRead = new Float32Array(N * stages * 4);
 
     
     var outputSize = 2;
@@ -185,45 +155,19 @@ fft.makePlan = function(stages, direction, reduce) {
                 var twiddle_i = Math.sin(- dirFactor * 2 * Math.PI * k / outputSize);
                 
                 //Even:
-                imageDataRead[getIndex(i1, row, N) + 0] = Math.floor(i1 / 256);
-                imageDataRead[getIndex(i1, row, N) + 1] = i1 % 256;
+                imageDataTwiddleRead[getIndex(i1, row, N) + 0] = twiddle_r;
+                imageDataTwiddleRead[getIndex(i1, row, N) + 1] = twiddle_i;
                 //Odd:
-                imageDataRead[getIndex(i1, row, N) + 2] = Math.floor(i2 / 256);
-                imageDataRead[getIndex(i1, row, N) + 3] = i2 % 256;
-                
-                var packedR, packedI;
-                packedR = fft.packNumber(twiddle_r);
-                packedI = fft.packNumber(twiddle_i);
-                
-                imageDataTwiddleR[getIndex(i1, row, N) + 0] = packedR[0];
-                imageDataTwiddleR[getIndex(i1, row, N) + 1] = packedR[1];
-                imageDataTwiddleR[getIndex(i1, row, N) + 2] = packedR[2];
-                imageDataTwiddleR[getIndex(i1, row, N) + 3] = packedR[3];
-                
-                imageDataTwiddleI[getIndex(i1, row, N) + 0] = packedI[0];
-                imageDataTwiddleI[getIndex(i1, row, N) + 1] = packedI[1];
-                imageDataTwiddleI[getIndex(i1, row, N) + 2] = packedI[2];
-                imageDataTwiddleI[getIndex(i1, row, N) + 3] = packedI[3];
+                imageDataTwiddleRead[getIndex(i1, row, N) + 2] = i1;
+                imageDataTwiddleRead[getIndex(i1, row, N) + 3] = i2;
+
             
                 //Even
-                imageDataRead[getIndex(i2, row, N) + 0] = Math.floor(i1 / 256);
-                imageDataRead[getIndex(i2, row, N) + 1] = i1 % 256;
+                imageDataTwiddleRead[getIndex(i2, row, N) + 0] = -twiddle_r;
+                imageDataTwiddleRead[getIndex(i2, row, N) + 1] = -twiddle_i;
                 //Odd
-                imageDataRead[getIndex(i2, row, N) + 2] = Math.floor(i2 / 256);
-                imageDataRead[getIndex(i2, row, N) + 3] = i2 % 256;
-                
-                packedR = fft.packNumber(-twiddle_r);
-                packedI = fft.packNumber(-twiddle_i);
-                
-                imageDataTwiddleR[getIndex(i2, row, N) + 0] = packedR[0];
-                imageDataTwiddleR[getIndex(i2, row, N) + 1] = packedR[1];
-                imageDataTwiddleR[getIndex(i2, row, N) + 2] = packedR[2];
-                imageDataTwiddleR[getIndex(i2, row, N) + 3] = packedR[3];
-
-                imageDataTwiddleI[getIndex(i2, row, N) + 0] = packedI[0];
-                imageDataTwiddleI[getIndex(i2, row, N) + 1] = packedI[1];
-                imageDataTwiddleI[getIndex(i2, row, N) + 2] = packedI[2];
-                imageDataTwiddleI[getIndex(i2, row, N) + 3] = packedI[3];
+                imageDataTwiddleRead[getIndex(i2, row, N) + 2] = i1;
+                imageDataTwiddleRead[getIndex(i2, row, N) + 3] = i2;
                 
             }
         }
@@ -232,19 +176,17 @@ fft.makePlan = function(stages, direction, reduce) {
     }
 
     return {
-        N          : N, 
-        reduce     : reduceFactor,
-        stages     : stages, 
-        bitReverse : glUtils.makeSimpleTexture(N, 1     , imageDataBitReverse),
-        twiddlesR  : glUtils.makeSimpleTexture(N, stages, imageDataTwiddleR  ),
-        twiddlesI  : glUtils.makeSimpleTexture(N, stages, imageDataTwiddleI  ),
-        read       : glUtils.makeSimpleTexture(N, stages, imageDataRead      ),        
+        N           : N, 
+        reduce      : reduceFactor,
+        stages      : stages, 
+        bitReverse  : glUtils.makeTextureGeneric(gl, N, 1     , gl.FLOAT, gl.NEAREST, gl.CLAMP_TO_EDGE, imageDataBitReverse),
+        twiddleRead : glUtils.makeTextureGeneric(gl, N, stages, gl.FLOAT, gl.NEAREST, gl.CLAMP_TO_EDGE, imageDataTwiddleRead      ),        
     }
         
     
 }
 
-fft.computeFft = function(fftProgs, fftPlan, dataReal, dataImag, outputFrameBufferReal, outputFrameBufferImag, tempFrameBufferReal, tempFrameBufferImag) {
+fft.computeFft = function(fftProgs, fftPlan, data, outputFrameBuffer, tempFrameBuffer) {
     var gl = fftProgs.gl;
     var stages = fftPlan.stages;
     var size = fftPlan.N;
@@ -272,42 +214,26 @@ fft.computeFft = function(fftProgs, fftPlan, dataReal, dataImag, outputFrameBuff
     	fftProgs.bitReverseProgramInfo.setters.u_bitReverse(1);
     	fftProgs.bitReverseProgramInfo.setters.u_n(size);
     
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
     
 
-    function getFromBufferReal(direction) {
+    function getFromBuffer(direction) {
         if(direction == directions.FORWARD) {
-            return outputFrameBufferReal;
+            return outputFrameBuffer;
         } else if(direction == directions.BACKWARD) {
-            return tempFrameBufferReal;
+            return tempFrameBuffer;
         }
     }
     
-    function getFromBufferImag(direction) {
+    function getToBuffer(direction) {
         if(direction == directions.FORWARD) {
-            return outputFrameBufferImag;
+            return tempFrameBuffer;
         } else if(direction == directions.BACKWARD) {
-            return tempFrameBufferImag;
-        }
-    }
-    
-    function getToBufferReal(direction) {
-        if(direction == directions.FORWARD) {
-            return tempFrameBufferReal;
-        } else if(direction == directions.BACKWARD) {
-            return outputFrameBufferReal;
+            return outputFrameBuffer;
         }
     }
 
-    function getToBufferImag(direction) {
-        if(direction == directions.FORWARD) {
-            return tempFrameBufferImag;
-        } else if(direction == directions.BACKWARD) {
-            return outputFrameBufferImag;
-        }
-    }
-    
     function swapDirection(direction) {
         if(direction == directions.FORWARD) {
             return directions.BACKWARD;
@@ -322,61 +248,39 @@ fft.computeFft = function(fftProgs, fftPlan, dataReal, dataImag, outputFrameBuff
     
         glUtils.bindRectBuffer(gl, fftProgs.stageProgramInfo, fftProgs.unitRectBuffer);
     
-        gl.activeTexture(gl.TEXTURE2);
-    	gl.bindTexture(gl.TEXTURE_2D, fftPlan.twiddlesR.texture);
+        gl.activeTexture(gl.TEXTURE1);
+    	gl.bindTexture(gl.TEXTURE_2D, fftPlan.twiddleRead.texture);
         
-        gl.activeTexture(gl.TEXTURE3);
-    	gl.bindTexture(gl.TEXTURE_2D, fftPlan.twiddlesI.texture);
-
-        gl.activeTexture(gl.TEXTURE4);
-    	gl.bindTexture(gl.TEXTURE_2D, fftPlan.read.texture);
-
-
-    	fftProgs.stageProgramInfo.setters.u_image_r(0);
-    	fftProgs.stageProgramInfo.setters.u_image_i(1);
-    	fftProgs.stageProgramInfo.setters.u_twiddles_r(2);
-    	fftProgs.stageProgramInfo.setters.u_twiddles_i(3);
-    	fftProgs.stageProgramInfo.setters.u_read(4);
+    	fftProgs.stageProgramInfo.setters.u_image(0);
+    	fftProgs.stageProgramInfo.setters.u_twiddleRead(1);
     	fftProgs.stageProgramInfo.setters.u_reduce(fftPlan.reduce);
     	fftProgs.stageProgramInfo.setters.u_numStages(stages);
     	fftProgs.stageProgramInfo.setters.u_n(size);
         
         for(var i = 0; i < stages; i++) {
             gl.activeTexture(gl.TEXTURE0);
-        	gl.bindTexture(gl.TEXTURE_2D, getFromBufferReal(direction).texture);
+        	gl.bindTexture(gl.TEXTURE_2D, getFromBuffer(direction).texture);
             
-            gl.activeTexture(gl.TEXTURE1);
-        	gl.bindTexture(gl.TEXTURE_2D, getFromBufferImag(direction).texture);
-    
         	fftProgs.stageProgramInfo.setters.u_stage(i);
-            
 
-            //Real
-            gl.bindFramebuffer(gl.FRAMEBUFFER, getToBufferReal(direction).frameBuffer);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, getToBuffer(direction).frameBuffer);
         	
-            fftProgs.stageProgramInfo.setters.u_outputReal(1);
-            
             gl.viewport(0, 0, size, size); 
         
-	    	gl.drawArrays(gl.TRIANGLES, 0, 6);
+	    	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             
-            //Imag
-            gl.bindFramebuffer(gl.FRAMEBUFFER, getToBufferImag(direction).frameBuffer);
-
-            fftProgs.stageProgramInfo.setters.u_outputReal(0);
-
-            gl.viewport(0, 0, size, size); 
-        
-	    	gl.drawArrays(gl.TRIANGLES, 0, 6);
-            
-            
+            gl.flush();
             
             direction = swapDirection(direction);
         }
         return direction;
     }
 
-    function transposeBuffers(bufferIn, bufferOut, straightCopy) {
+    
+    function transpose(direction, straightCopy) {
+        var bufferIn = getFromBuffer(direction);
+        var bufferOut = getToBuffer(direction);
+
     	gl.useProgram(fftProgs.transformProgramInfo.program);
     
         gl.bindFramebuffer(gl.FRAMEBUFFER, bufferOut.frameBuffer);
@@ -390,26 +294,19 @@ fft.computeFft = function(fftProgs, fftPlan, dataReal, dataImag, outputFrameBuff
         fftProgs.transformProgramInfo.setters.u_image(0);
         fftProgs.transformProgramInfo.setters.u_transpose(straightCopy ? 0 : 1);
     
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-    }
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    
-    function transpose(direction, straightCopy) {
-        transposeBuffers(getFromBufferReal(direction), getToBufferReal(direction), straightCopy);
-        transposeBuffers(getFromBufferImag(direction), getToBufferImag(direction), straightCopy);
-        
         return swapDirection(direction);
     }
 
-    bitReverse(dataReal, tempFrameBufferReal);
-    bitReverse(dataImag, tempFrameBufferImag);
+    bitReverse(data, tempFrameBuffer);
     var dir = directions.BACKWARD;
+
     
     dir = transform(dir);
     dir = transpose(dir, false);
     
-    bitReverse(getFromBufferReal(dir), getToBufferReal(dir));
-    bitReverse(getFromBufferImag(dir), getToBufferImag(dir));
+    bitReverse(getFromBuffer(dir), getToBuffer(dir));
     dir = swapDirection(dir);
 
     dir = transform(dir);
@@ -419,7 +316,7 @@ fft.computeFft = function(fftProgs, fftPlan, dataReal, dataImag, outputFrameBuff
         transpose(dir, true);
 }
 
-fft.colorMap = function(fftProgs, colorMap, inputBuffer0, inputBuffer1, inputBuffer2, outputBuffer) {
+fft.colorMap = function(fftProgs, colorMap, inputBuffer, outputBuffer) {
     var gl = fftProgs.gl;
 	
     gl.useProgram(fftProgs.colorMapProgramInfo.program);
@@ -430,23 +327,15 @@ fft.colorMap = function(fftProgs, colorMap, inputBuffer0, inputBuffer1, inputBuf
     glUtils.bindRectBuffer(gl, fftProgs.colorMapProgramInfo, fftProgs.unitRectBuffer);
 
     gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_2D, inputBuffer0.texture);
+	gl.bindTexture(gl.TEXTURE_2D, inputBuffer.texture);
 
     gl.activeTexture(gl.TEXTURE1);
-	gl.bindTexture(gl.TEXTURE_2D, inputBuffer1.texture);
-
-    gl.activeTexture(gl.TEXTURE2);
-	gl.bindTexture(gl.TEXTURE_2D, inputBuffer2.texture);
-
-    gl.activeTexture(gl.TEXTURE3);
 	gl.bindTexture(gl.TEXTURE_2D, colorMap.texture);
 
-    fftProgs.colorMapProgramInfo.setters.u_image_0(0);
-    fftProgs.colorMapProgramInfo.setters.u_image_1(1);
-    fftProgs.colorMapProgramInfo.setters.u_image_2(2);
-    fftProgs.colorMapProgramInfo.setters.u_colorMap(3);
+    fftProgs.colorMapProgramInfo.setters.u_image(0);
+    fftProgs.colorMapProgramInfo.setters.u_colorMap(1);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
 fft.scale = function(fftProgs, scaleFactor, inputBuffer, outputBuffer) {
@@ -465,7 +354,7 @@ fft.scale = function(fftProgs, scaleFactor, inputBuffer, outputBuffer) {
     fftProgs.scaleProgramInfo.setters.u_image(0);
     fftProgs.scaleProgramInfo.setters.u_scale(scaleFactor);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
 fft.bicubic = function(fftProgs, inputBuffer, outputBuffer) {
@@ -484,7 +373,7 @@ fft.bicubic = function(fftProgs, inputBuffer, outputBuffer) {
     fftProgs.bicubicProgramInfo.setters.u_image(0);
     fftProgs.bicubicProgramInfo.setters.u_size([inputBuffer.width, inputBuffer.height]);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
 fft.gradient = function(fftProgs, directionVector, dist, inputBuffer, outputBuffer) {
@@ -505,7 +394,7 @@ fft.gradient = function(fftProgs, directionVector, dist, inputBuffer, outputBuff
     fftProgs.gradientProgramInfo.setters.u_gradVec(directionVector);
     fftProgs.gradientProgramInfo.setters.u_dist(dist);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
 fft.noise = function(fftProgs, seed, outputBuffer) {
@@ -520,7 +409,7 @@ fft.noise = function(fftProgs, seed, outputBuffer) {
     
     fftProgs.noiseProgramInfo.setters.u_seed(seed);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
 fft.gaussianNoise = function(fftProgs, seed, scale, outputBuffer) {
@@ -536,7 +425,7 @@ fft.gaussianNoise = function(fftProgs, seed, scale, outputBuffer) {
     fftProgs.gaussianNoiseProgramInfo.setters.u_seed(seed);
     fftProgs.gaussianNoiseProgramInfo.setters.u_scale(scale);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
 
@@ -564,7 +453,7 @@ fft.runCustomProgram = function(gl, programInfo, inputBuffer, outputBuffer, u_1,
     
         
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
 fft.runCustomProgram2 = function(gl, programInfo, inputBuffer0, inputBuffer1, outputBuffer, u_1, u_2, u_3, u_4) {
@@ -597,5 +486,5 @@ fft.runCustomProgram2 = function(gl, programInfo, inputBuffer0, inputBuffer1, ou
         programInfo.setters.u_3(u_4);
     
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }

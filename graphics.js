@@ -55,7 +55,7 @@ graphics.drawBox = function(programs, x, y, w, h, color) {
 	programs.primitiveProgramInfo.setters.u_color(color);
 	
 	//draw
-	gl.drawArrays(gl.TRIANGLES, 0, 6);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 	
 }
 
@@ -112,7 +112,7 @@ graphics.drawSprite = function(programs, sx, sy, sw, sh, x, y, w, h, sprite, mas
 	programs.spriteProgramInfo.setters.u_mask(mask);
 	
 	//draw
-	gl.drawArrays(gl.TRIANGLES, 0, 6);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 	
 }
 
@@ -143,6 +143,6 @@ graphics.drawSpriteMask = function(programs, sx, sy, sw, sh, mx, my, mw, mh, x, 
 	programs.spriteMaskProgramInfo.setters.u_mask(1);
 	
 	//draw
-	gl.drawArrays(gl.TRIANGLES, 0, 6);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 	
 }

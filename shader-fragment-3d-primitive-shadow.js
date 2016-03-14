@@ -22,7 +22,7 @@ void main() {
     float shadowLightFactor = getShadowLightFactor(lightPerspectiveDepth);
     
     vec4 colorOut = (u_color + v_pos.z * u_zColor) * (u_ambient + (1.0 - u_ambient) * directionalLightFactor * shadowLightFactor);
-	gl_FragColor = colorOut;
+	gl_FragColor = vec4(colorOut.rgb, 1.0);
 }
 /*
 float2 get_shadow_offsets(float3 N, float3 L) { 

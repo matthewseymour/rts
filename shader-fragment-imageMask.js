@@ -1,4 +1,4 @@
-var spriteMaskFragmentSource = `
+var imageMaskFragmentSource = `
 precision highp float;
 
 uniform sampler2D u_image;

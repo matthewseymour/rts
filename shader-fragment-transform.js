@@ -6,6 +6,7 @@ uniform sampler2D u_image;
 uniform float u_1;
 uniform float u_2;
 uniform float u_3;
+uniform float u_4;
 
 
 varying vec2 v_texCoord;

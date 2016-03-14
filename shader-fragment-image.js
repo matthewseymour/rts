@@ -1,4 +1,4 @@
-var spriteFragmentSource = `
+var imageFragmentSource = `
 precision highp float;
 
 uniform sampler2D u_image;

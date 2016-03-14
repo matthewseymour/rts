@@ -1,4 +1,4 @@
-var fftVertexSource = `
+var computeVertexSource = `
 precision highp float;
 
 attribute vec2 a_position;

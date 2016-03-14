@@ -1,13 +1,13 @@
 "use strict";
 
-const geometry = {};
+const Geometry = {};
 /*
     Box specified by the x-left, y-bottom, x-right, y-top
     Move-box specified by the same for the initial position, then the dx and dy
 
     Returns true if they intersect
 */
-geometry.boxMoveBoxCollision = function(boxXl, boxYb, boxXr, boxYt, moveXl, moveYb, moveXr, moveYt, moveDx, moveDy) {
+Geometry.boxMoveBoxCollision = function(boxXl, boxYb, boxXr, boxYt, moveXl, moveYb, moveXr, moveYt, moveDx, moveDy) {
     /*
     We use the Separating Axis Theorem. For the axes we use the normals of the edges that make up the 
     polygons. In this case we have the box and the move-box. For the box we have four edges which are 
@@ -68,6 +68,44 @@ geometry.boxMoveBoxCollision = function(boxXl, boxYb, boxXr, boxYt, moveXl, move
 }
 
 
-geometry.distance = function(x1, y1, x2, y2) {
+Geometry.distance = function(x1, y1, x2, y2) {
     return Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+}
+
+Geometry.unitVec = function(vec) {
+    var mag = Math.sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+    return {x: vec.x / mag, y: vec.y / mag, z: vec.z / mag};
+}
+
+Geometry.normal = function(p1x, p1y, p1z, p2x, p2y, p2z, p3x, p3y, p3z) {
+    var cp = Geometry.crossProduct(p2x - p1x, p2y - p1y, p2z - p1z, p3x - p1x, p3y - p1y, p3z - p1z);
+    return Geometry.unitVec(cp);
+}
+
+Geometry.crossProduct = function(v1x, v1y, v1z, v2x, v2y, v2z) {
+    return { 
+        x: v1y * v2z - v1z * v2y,
+        y: v1z * v2x - v1x * v2z,
+        z: v1x * v2y - v1y * v2x
+    };
+}
+
+Geometry.fixAngle = function(a) {
+    return a - 2 * Math.PI * Math.floor(a / (2 * Math.PI)); //Floored division
+}
+
+//a1,a2: the angles. Must be in the range [0, 2 pi)
+//t: 0-1, 0 gives a1, 1 gives a2, in between gives an interpolation of the angle
+Geometry.interpolateAngle = function(a1, a2, t) {
+    var angleDiff = a2 - a1;
+    if(angleDiff > Math.PI)
+        angleDiff -= 2 * Math.PI;
+    if(angleDiff < -Math.PI)
+        angleDiff += 2 * Math.PI;
+    
+    return a1 + t * angleDiff;
+}
+
+Geometry.interpolatePosition = function(p1, p2, t) {
+    return {x: p1.x * (1 - t) + p2.x * t, y: p1.y * (1 - t) + p2.y * t};
 }

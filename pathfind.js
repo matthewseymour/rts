@@ -24,8 +24,27 @@ const INDEX_NUM_NEIGHBOURS = 2;
 const INDEX_NEIGHBOURS = 8;
 const PATHFIND_ITERATIONS = 100;
 
+const Pathfind = {};
+
+Pathfind.canPlace = function(map, position, size) {
+    return Pathfind.canMove(map, position, position, size);
+}
+
+Pathfind.canMove = function(map, start, end, size) {
+    if(passLineBox(start.x, start.y, end.x, end.y, size, map.passabilityMap) && 
+        !checkCollision(map.obstacleStore, start.x, start.y, end.x, end.y, size)) 
+    {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
 
 function getNodeIndex(i, j, width) { return i + j * width; }
+
+
 
 function buildPathfindNodeInfo(passabilityMap, size) {
     var nodesX = Math.floor(passabilityMap.width / NODE_SPACING);
@@ -64,6 +83,14 @@ function buildPathfindNodeInfo(passabilityMap, size) {
     };
 }
 
+
+function getPosition(node, nodeInfo) {
+    var row = Math.floor(node / nodeInfo.nodesWidth);
+    var col = node - row * nodeInfo.nodesWidth;
+    
+    return {x: col * NODE_SPACING + NODE_SPACING / 2,
+            y: row * NODE_SPACING + NODE_SPACING / 2};
+}
 
 //Delete this
 function getNearestNode(x, y, nodeInfo) {
@@ -138,7 +165,7 @@ function drawNodeListView(graphicsPrograms, nodeListView, view) {
 
     var offsetScale = convertToScreen({x: 1, y: 1}, view);
     
-    graphics.drawLines(graphicsPrograms, nodeListView.buffer, nodeListView.numLines, 
+    Graphics.drawLines(graphicsPrograms, nodeListView.buffer, nodeListView.numLines, 
         offset.x, offset.y, offsetScale.x - offset.x, offsetScale.y - offset.y, [1,1,1,.25]);
     
 }
@@ -182,7 +209,7 @@ function checkCollision(store, x1, y1, x2, y2, size) {
 
 
     for(var box of store) {
-        if(geometry.boxMoveBoxCollision(box.x - box.size, box.y - box.size, box.x + box.size, box.y + box.size, xLeft, yBot, xRight, yTop, dx, dy)) {
+        if(Geometry.boxMoveBoxCollision(box.x - box.size, box.y - box.size, box.x + box.size, box.y + box.size, xLeft, yBot, xRight, yTop, dx, dy)) {
             return true;
         }
     }
@@ -193,7 +220,7 @@ function drawObstacleStore(graphicsPrograms, store, view) {
     for(var box of store) {
         var p1 = convertToScreen({x: box.x - box.size, y: box.y - box.size}, view);
         var p2 = convertToScreen({x: box.x + box.size, y: box.y + box.size}, view);
-        graphics.drawBox(graphicsPrograms, p1.x, p1.y, p2.x - p1.x, p2.y - p1.y, [1,0,.3,.5]);
+        Graphics.drawBox(graphicsPrograms, p1.x, p1.y, p2.x - p1.x, p2.y - p1.y, [1,0,.3,.5]);
         
     };
 }
@@ -253,7 +280,7 @@ function getPathfinder(nodeInfo) {
     };
 }
 
-function startNewPath(pathfinder, nodeInfo, start, end) {
+function startNewPath(pathfinder, nodeInfo, obstacleStore, passabilityMap, start, end) {
     var startNodes = getNearestNodes(start.x, start.y, nodeInfo);
     
     pathfinder.startPoint = start;
@@ -266,15 +293,19 @@ function startNewPath(pathfinder, nodeInfo, start, end) {
     pathfinder.setType.fill(setTypeEnum.NONE);
     emptySortedSet(pathfinder.openSet);
     
-    //Set the end node:
-    //pathfinder.endNode = endNode;
-    
     //The best node should actually be the one nearest the end point
     pathfinder.bestNode = getNearestNode(start.x, start.y, nodeInfo);
     
     //Insert the starting node:
     for(var i = 0; i < startNodes.length; i++) {
         //To do: check that the startNode is reachable from the start point
+        var startNodePosition = getPosition(startNodes[i], nodeInfo);
+        if(!passLineBox(start.x, start.y, startNodePosition.x, startNodePosition.y, nodeInfo.unitSize, passabilityMap) 
+            || checkCollision(obstacleStore, start.x, start.y, startNodePosition.x, startNodePosition.y, nodeInfo.unitSize)) 
+        {
+            continue;
+        }
+        
         pathfinder.gScore[startNodes[i]] = 0;
         pathfinder.fScore[startNodes[i]] = 0;
         pathfinder.cameFrom[startNodes[i]] = startNodes[i];
@@ -288,7 +319,7 @@ function startNewPath(pathfinder, nodeInfo, start, end) {
 
 function iteratePath(pathfinder, nodeInfo, obstacleStore) {
     function nodeDistance(n1, n2) {
-        return geometry.distance(
+        return Geometry.distance(
             nodeInfo.nodeList[n1 * ROW_WIDTH + INDEX_X],
             nodeInfo.nodeList[n1 * ROW_WIDTH + INDEX_Y],
             nodeInfo.nodeList[n2 * ROW_WIDTH + INDEX_X],
@@ -297,7 +328,7 @@ function iteratePath(pathfinder, nodeInfo, obstacleStore) {
     }
     
     function nodePointDistance(n, p) {
-        return geometry.distance(nodeInfo.nodeList[n * ROW_WIDTH + INDEX_X], nodeInfo.nodeList[n * ROW_WIDTH + INDEX_Y], p.x, p.y);
+        return Geometry.distance(nodeInfo.nodeList[n * ROW_WIDTH + INDEX_X], nodeInfo.nodeList[n * ROW_WIDTH + INDEX_Y], p.x, p.y);
     }
     
     var endNodes = getNearestNodes(pathfinder.endPoint.x, pathfinder.endPoint.y, nodeInfo);
@@ -356,6 +387,49 @@ function iteratePath(pathfinder, nodeInfo, obstacleStore) {
     }   
 }
 
+
+function getTarget(pathfinder, nodeInfo, obstacleStore, passabilityMap) {
+    function getXY(node) {
+        return {
+            x: nodeInfo.nodeList[node * ROW_WIDTH + INDEX_X],
+            y: nodeInfo.nodeList[node * ROW_WIDTH + INDEX_Y]
+        }
+    }
+    
+    function clearLine(x1, y1, x2, y2) {
+        return passLineBox(x1, y1, x2, y2, nodeInfo.unitSize, passabilityMap) && !checkCollision(obstacleStore, x1, y1, x2, y2, nodeInfo.unitSize);
+    }
+
+    var bestXY = getXY(pathfinder.bestNode);
+    var currentXY;
+    var currentNode;
+    
+    if(clearLine(pathfinder.endPoint.x, pathfinder.endPoint.y, bestXY.x, bestXY.y)) {
+        currentXY = pathfinder.endPoint;
+        currentNode = null;
+    } else {
+        currentXY = bestXY;
+        currentNode = pathfinder.bestNode;
+    }
+    
+    while(currentXY != pathfinder.startPoint) {
+        if(clearLine(currentXY.x, currentXY.y, pathfinder.startPoint.x, pathfinder.startPoint.y)) {
+            return currentXY;
+        } else {
+            if(currentNode == null) { 
+                currentNode = pathfinder.bestNode;
+            } else {
+                if(pathfinder.cameFrom[currentNode] == currentNode) {
+                    break;
+                }
+                currentNode = pathfinder.cameFrom[currentNode];
+            }
+            currentXY = getXY(currentNode);
+        }            
+    }
+    return currentXY;
+    
+}
 
 
 function getPath(pathfinder, nodeInfo, obstacleStore, passabilityMap) {

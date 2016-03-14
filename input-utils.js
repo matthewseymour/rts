@@ -4,7 +4,12 @@ const MouseClickEnum = {
 	left: 1,
 	middle: 2,
 	right: 3
-}
+};
+
+const keyStateEnum = {
+    KEY_DOWN: 1,
+    KEY_UP: 2
+};
 
 const KeyCodeEnum = {
 	SHIFT: 16,
@@ -56,7 +61,7 @@ const KeyCodeEnum = {
 	
 	PLUS: 187,
 	MINUS: 189
-}
+};
 
 function getMousePosition(e, canvas) {
 	var x;

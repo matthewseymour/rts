@@ -3,33 +3,33 @@
 const MINI_MAP_SIZE = 225;
 const SIDE_BAR_WIDTH = 240;
 
-const screen = {};
+const ScreenLayout = {};
 
-screen.canvas = document.getElementById("canvas");
+ScreenLayout.canvas = document.getElementById("canvas");
 
-screen.top = 0;
-screen.bottom = 0;
-screen.left = 0;
-screen.right = 0;
+ScreenLayout.top = 0;
+ScreenLayout.bottom = 0;
+ScreenLayout.left = 0;
+ScreenLayout.right = 0;
 
-screen.onResize = [];
+ScreenLayout.onResize = [];
 
 
 function resizeCanvas() {
     var height = document.body.offsetHeight;
     var width = document.body.offsetWidth;
-    screen.canvas.width = width;
-    screen.canvas.height = height;
+    ScreenLayout.canvas.width = width;
+    ScreenLayout.canvas.height = height;
     
-    screen.top = screen.bottom + height;
-    screen.right = screen.left + width;
+    ScreenLayout.top = ScreenLayout.bottom + height;
+    ScreenLayout.right = ScreenLayout.left + width;
     
-    screen.miniMapTop = screen.top - 5;
-    screen.miniMapLeft = screen.left + 5;
+    ScreenLayout.miniMapTop = ScreenLayout.top - 5;
+    ScreenLayout.miniMapLeft = ScreenLayout.left + 5;
     
-    screen.sideBarRight = screen.left + SIDE_BAR_WIDTH;
+    ScreenLayout.sideBarRight = ScreenLayout.left + SIDE_BAR_WIDTH;
     
-    for(var func of screen.onResize) {
+    for(var func of ScreenLayout.onResize) {
         func();
     }
 }

@@ -1,4 +1,4 @@
-var spriteVertexSource = `
+var imageVertexSource = `
 precision highp float;
 
 attribute vec2 a_position;

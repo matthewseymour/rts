@@ -7,32 +7,32 @@ function convertToWorld(position, view){
 }
 
 function getViewWindow(view) {
-    var xL = view.xOffset + screen.sideBarRight / SUB_TILE_WIDTH;
+    var xL = view.xOffset + ScreenLayout.sideBarRight / SUB_TILE_WIDTH;
     var yB = view.yOffset;
-    var xR = xL + (screen.right - screen.sideBarRight) / SUB_TILE_WIDTH;
-    var yT = yB + (screen.top - screen.bottom) / SUB_TILE_HEIGHT;
+    var xR = xL + (ScreenLayout.right - ScreenLayout.sideBarRight) / SUB_TILE_WIDTH;
+    var yT = yB + (ScreenLayout.top - ScreenLayout.bottom) / SUB_TILE_HEIGHT;
     
     return {left: xL, right: xR, top: yT, bottom: yB};
 }
 
 function enforceBounds(view) {
-    //Order matters here, if the game screen is larger than the entire map we want
+    //Order matters here, if the game ScreenLayout is larger than the entire map we want
     // the map pinned to the top left.
     if(view.yOffset < 0) {
         view.yOffset = 0;
     }
     
-    var maxY = view.worldHeight - screen.top / SUB_TILE_HEIGHT;
+    var maxY = view.worldHeight - ScreenLayout.top / SUB_TILE_HEIGHT;
     if(view.yOffset > maxY) {
         view.yOffset = maxY;
     }
     
-    var maxX = view.worldWidth - screen.right / SUB_TILE_WIDTH;
+    var maxX = view.worldWidth - ScreenLayout.right / SUB_TILE_WIDTH;
     if(view.xOffset > maxX) {
         view.xOffset = maxX;
     }
 
-    var minX = -screen.sideBarRight / SUB_TILE_WIDTH;
+    var minX = -ScreenLayout.sideBarRight / SUB_TILE_WIDTH;
     if(view.xOffset < minX) {
         view.xOffset = minX;
     }
@@ -46,10 +46,10 @@ function moveView(view, dir) {
 }
 
 function centerView(view, point) {
-    var screenWidthInTiles = (screen.right - screen.sideBarRight) / SUB_TILE_WIDTH;
-    var screenHeightInTiles = (screen.top - screen.bottom) / SUB_TILE_HEIGHT;
+    var screenWidthInTiles = (ScreenLayout.right - ScreenLayout.sideBarRight) / SUB_TILE_WIDTH;
+    var screenHeightInTiles = (ScreenLayout.top - ScreenLayout.bottom) / SUB_TILE_HEIGHT;
     
-    view.xOffset = point.x - screenWidthInTiles / 2 - screen.sideBarRight / SUB_TILE_WIDTH;
+    view.xOffset = point.x - screenWidthInTiles / 2 - ScreenLayout.sideBarRight / SUB_TILE_WIDTH;
     view.yOffset = point.y - screenHeightInTiles / 2;
 
     enforceBounds(view);

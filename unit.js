@@ -5,16 +5,20 @@ const Unit = {};
 var NEXT_UNIT_ID = 0;
 
 Unit.makeNewUnit = function(position, game) {
+    var obstacle = getObstacle(position.x, position.y, UNIT_SIZE);
     var unit = {
         lastPosition: {x: position.x, y: position.y},
         position: {x: position.x, y: position.y},
         destination: {x: Math.random() * game.map.width, y: Math.random() * game.map.height},
         lastRotation: 0,
         rotation: 0,
-        pathfinder: getPathfinder(game.map.pathfindNodeInfo),
+        mapObstacle: obstacle,
+        pathfinder: getPathfinder(game.map.pathfindNodeInfo, obstacle),
         id: NEXT_UNIT_ID,
 
     };
+    
+    addObstacle(game.map.obstacleStore, obstacle);
     
     NEXT_UNIT_ID++;
     return unit;
@@ -29,7 +33,7 @@ Unit.updateUnit = function(unit, game) {
     if(Math.random() * 100 < 2) {
         unit.destination.x = Math.random() * game.map.width;
         unit.destination.y = Math.random() * game.map.height;
-        startNewPath(unit.pathfinder, game.map.pathfindNodeInfo, game.map.obstacleStore, game.map.passabilityMap, unit.position, unit.destination);
+        startNewPath(unit.pathfinder, game.map, unit.position, unit.destination);
     }
     
 
@@ -37,7 +41,7 @@ Unit.updateUnit = function(unit, game) {
         iteratePath(unit.pathfinder, game.map.pathfindNodeInfo, game.map.obstacleStore);
     }
     
-    var tempDestination = getTarget(unit.pathfinder, game.map.pathfindNodeInfo, game.map.obstacleStore, game.map.passabilityMap);
+    var tempDestination = getTarget(unit.pathfinder, game.map);
     
     const rotationSpeed = .2;
     
@@ -59,11 +63,12 @@ Unit.updateUnit = function(unit, game) {
         y: unit.position.y + 1 * Math.sin(unit.rotation)
     };
     
-    if(Pathfind.canMove(game.map, unit.position, newPosition, UNIT_SIZE)) {
+    if(Pathfind.canMove(game.map, unit.position, newPosition, UNIT_SIZE, unit.mapObstacle)) {
         unit.position.x = newPosition.x;
         unit.position.y = newPosition.y;
+        moveObstacle(game.map.obstacleStore, unit.mapObstacle, newPosition.x, newPosition.y);
     } else {
-        startNewPath(unit.pathfinder, game.map.pathfindNodeInfo, game.map.obstacleStore, game.map.passabilityMap, unit.position, unit.destination)
+        startNewPath(unit.pathfinder, game.map, unit.position, unit.destination)
     }
 }
 
@@ -121,7 +126,7 @@ Unit.drawUnit = function(unit, map, view, timeAccRatio, gl, assets) {
     Graphics.drawBox(graphicsPrograms, p1.x, p1.y, p2.x - p1.x, p2.y - p1.y, [0,1,.3,.1]);
     textWriters[8].writeTextRight(unit.id.toString(), [1,1,1,1], p1.x, p1.y);
     
-    var path = getPath(unit.pathfinder, game.map.pathfindNodeInfo, game.map.obstacleStore, game.map.passabilityMap);
+    var path = getPath(unit.pathfinder, game.map);
     for(var i = 0; i < path.length - 1; i++) {
         var p1 = convertToScreen(path[i], view);
         var p2 = convertToScreen(path[i + 1], view);

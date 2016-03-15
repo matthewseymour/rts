@@ -27,17 +27,11 @@ const PATHFIND_ITERATIONS = 100;
 const Pathfind = {};
 
 Pathfind.canPlace = function(map, position, size) {
-    return Pathfind.canMove(map, position, position, size);
+    return Pathfind.canMove(map, position, position, size, null);
 }
 
-Pathfind.canMove = function(map, start, end, size) {
-    if(passLineBox(start.x, start.y, end.x, end.y, size, map.passabilityMap) && 
-        !checkCollision(map.obstacleStore, start.x, start.y, end.x, end.y, size)) 
-    {
-        return true;
-    } else {
-        return false;
-    }
+Pathfind.canMove = function(map, start, end, size, obstacleToIgnore) {
+    return passLineBox(start.x, start.y, end.x, end.y, size, map.passabilityMap) && !checkCollision(map.obstacleStore, obstacleToIgnore, start.x, start.y, end.x, end.y, size);
 }
 
 
@@ -197,7 +191,7 @@ function removeObstacle(store, obs) {
     store.splice(index, 1);
 }
 
-function checkCollision(store, x1, y1, x2, y2, size) {
+function checkCollision(store, ignore, x1, y1, x2, y2, size) {
     
     var dx = x2 - x1;
     var dy = y2 - y1;
@@ -209,6 +203,8 @@ function checkCollision(store, x1, y1, x2, y2, size) {
 
 
     for(var box of store) {
+        if(box == ignore)
+            continue;
         if(Geometry.boxMoveBoxCollision(box.x - box.size, box.y - box.size, box.x + box.size, box.y + box.size, xLeft, yBot, xRight, yTop, dx, dy)) {
             return true;
         }
@@ -264,7 +260,7 @@ const setTypeEnum = {
     CLOSED: 2
 };
 
-function getPathfinder(nodeInfo) {
+function getPathfinder(nodeInfo, obstacleToIgnore) {
     var numNodes = nodeInfo.nodeList.length;
     
     return {
@@ -276,11 +272,14 @@ function getPathfinder(nodeInfo) {
         startPoint: {x:0, y:0},
         endPoint: {x: 0, y: 0},
         bestNode: 0,
-        finished: false
+        finished: false,
+        obstacleToIgnore: obstacleToIgnore,
     };
 }
 
-function startNewPath(pathfinder, nodeInfo, obstacleStore, passabilityMap, start, end) {
+function startNewPath(pathfinder, map, start, end) {
+    var nodeInfo = map.pathfindNodeInfo;
+    
     var startNodes = getNearestNodes(start.x, start.y, nodeInfo);
     
     pathfinder.startPoint = start;
@@ -300,8 +299,9 @@ function startNewPath(pathfinder, nodeInfo, obstacleStore, passabilityMap, start
     for(var i = 0; i < startNodes.length; i++) {
         //To do: check that the startNode is reachable from the start point
         var startNodePosition = getPosition(startNodes[i], nodeInfo);
-        if(!passLineBox(start.x, start.y, startNodePosition.x, startNodePosition.y, nodeInfo.unitSize, passabilityMap) 
-            || checkCollision(obstacleStore, start.x, start.y, startNodePosition.x, startNodePosition.y, nodeInfo.unitSize)) 
+        //if(!passLineBox(start.x, start.y, startNodePosition.x, startNodePosition.y, nodeInfo.unitSize, passabilityMap) 
+        //    || checkCollision(obstacleStore, __ignore__, start.x, start.y, startNodePosition.x, startNodePosition.y, nodeInfo.unitSize)) 
+        if(!Pathfind.canMove(map, start, startNodePosition, nodeInfo.unitSize, pathfinder.obstacleToIgnore))
         {
             continue;
         }
@@ -360,6 +360,7 @@ function iteratePath(pathfinder, nodeInfo, obstacleStore) {
             
             //To do here: dynamic check for obstacles between neighbour and current
             if(checkCollision(obstacleStore, 
+                    pathfinder.obstacleToIgnore, 
                     nodeInfo.nodeList[current * ROW_WIDTH + INDEX_X], nodeInfo.nodeList[current * ROW_WIDTH + INDEX_Y], 
                     nodeInfo.nodeList[neighbour * ROW_WIDTH + INDEX_X], nodeInfo.nodeList[neighbour * ROW_WIDTH + INDEX_Y], 
                     nodeInfo.unitSize)) {
@@ -388,7 +389,8 @@ function iteratePath(pathfinder, nodeInfo, obstacleStore) {
 }
 
 
-function getTarget(pathfinder, nodeInfo, obstacleStore, passabilityMap) {
+function getTarget(pathfinder, map) {
+    var nodeInfo = map.pathfindNodeInfo;
     function getXY(node) {
         return {
             x: nodeInfo.nodeList[node * ROW_WIDTH + INDEX_X],
@@ -396,15 +398,11 @@ function getTarget(pathfinder, nodeInfo, obstacleStore, passabilityMap) {
         }
     }
     
-    function clearLine(x1, y1, x2, y2) {
-        return passLineBox(x1, y1, x2, y2, nodeInfo.unitSize, passabilityMap) && !checkCollision(obstacleStore, x1, y1, x2, y2, nodeInfo.unitSize);
-    }
-
     var bestXY = getXY(pathfinder.bestNode);
     var currentXY;
     var currentNode;
     
-    if(clearLine(pathfinder.endPoint.x, pathfinder.endPoint.y, bestXY.x, bestXY.y)) {
+    if(Pathfind.canMove(map, pathfinder.endPoint, bestXY, nodeInfo.unitSize, pathfinder.obstacleToIgnore)) {
         currentXY = pathfinder.endPoint;
         currentNode = null;
     } else {
@@ -413,7 +411,7 @@ function getTarget(pathfinder, nodeInfo, obstacleStore, passabilityMap) {
     }
     
     while(currentXY != pathfinder.startPoint) {
-        if(clearLine(currentXY.x, currentXY.y, pathfinder.startPoint.x, pathfinder.startPoint.y)) {
+        if(Pathfind.canMove(map, currentXY, pathfinder.startPoint, nodeInfo.unitSize, pathfinder.obstacleToIgnore)) {
             return currentXY;
         } else {
             if(currentNode == null) { 
@@ -432,7 +430,8 @@ function getTarget(pathfinder, nodeInfo, obstacleStore, passabilityMap) {
 }
 
 
-function getPath(pathfinder, nodeInfo, obstacleStore, passabilityMap) {
+function getPath(pathfinder, map) {
+    var nodeInfo = map.pathfindNodeInfo;
     function getXY(node) {
         return {
             x: nodeInfo.nodeList[node * ROW_WIDTH + INDEX_X],
@@ -440,9 +439,6 @@ function getPath(pathfinder, nodeInfo, obstacleStore, passabilityMap) {
         }
     }
     
-    function clearLine(x1, y1, x2, y2) {
-        return passLineBox(x1, y1, x2, y2, nodeInfo.unitSize, passabilityMap) && !checkCollision(obstacleStore, x1, y1, x2, y2, nodeInfo.unitSize);
-    }
 
     var path = [];
     
@@ -450,7 +446,7 @@ function getPath(pathfinder, nodeInfo, obstacleStore, passabilityMap) {
     var currentXY;
     var currentNode;
     
-    if(clearLine(pathfinder.endPoint.x, pathfinder.endPoint.y, bestXY.x, bestXY.y)) {
+    if(Pathfind.canMove(map, pathfinder.endPoint, bestXY, nodeInfo.unitSize, pathfinder.obstacleToIgnore)) {
         currentXY = pathfinder.endPoint;
         currentNode = null;
     } else {
@@ -460,7 +456,7 @@ function getPath(pathfinder, nodeInfo, obstacleStore, passabilityMap) {
     
     path.push(currentXY);
     while(currentXY != pathfinder.startPoint) {
-        if(clearLine(currentXY.x, currentXY.y, pathfinder.startPoint.x, pathfinder.startPoint.y)) {
+        if(Pathfind.canMove(map, currentXY, pathfinder.startPoint, nodeInfo.unitSize, pathfinder.obstacleToIgnore)) {
             currentXY = pathfinder.startPoint;
         } else {
             if(currentNode == null) { 

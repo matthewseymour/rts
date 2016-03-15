@@ -80,13 +80,7 @@ function initAssets() {
 }
 
 initAssets();
-var game = makeNewGame(375);//375);
-
-/*
-var testObs = getObstacle(90, 90, 6);
-var testObsPosition = {x: 90, y: 90};
-addObstacle(game.map.obstacleStore, testObs);
-*/
+var game = makeNewGame(300);//375);
 
 var lastTime = 0;
 var timeAcc = 0;
@@ -194,7 +188,7 @@ function drawMapElements(graphicsPrograms, game, view, timeDiff, timeAccRatio) {
     if(showPathfind) {
         drawNodeListView(graphicsPrograms, game.pathfindView, view);
     }
-    drawObstacleStore(graphicsPrograms, game.map.obstacleStore, view);
+    //drawObstacleStore(graphicsPrograms, game.map.obstacleStore, view);
     
     for(var i = 0; i < game.units.length; i++) {
         Unit.drawUnit(game.units[i], game.map, view, timeAccRatio, gl, assets);

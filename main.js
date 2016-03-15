@@ -12,7 +12,7 @@ const UNIT_SIZE = 2;
 
 
 
-var gl = ScreenLayout.canvas.getContext("experimental-webgl", 
+var gl = ScreenLayout.canvas.getContext("webgl", 
 {
     alpha: false,
     antialias: true

@@ -32,6 +32,9 @@ Geometry.boxMoveBoxCollision = function(boxXl, boxYb, boxXr, boxYt, moveXl, move
     if(boxXl >= Math.max(moveXr, moveXr + moveDx) || boxXr <= Math.min(moveXl, moveXl + moveDx))
         return false;
     
+    if(moveDx == 0 && moveDy == 0) //The two axes checked cover all cases in this case. Overlap along all axes, return true
+        return true;
+    
     //Lastly we check the axis normal to (dx,dy):
     //No need to normalize the vector. Not doing so also ensures that the answer is exact if all values are 
     //integers
@@ -67,9 +70,16 @@ Geometry.boxMoveBoxCollision = function(boxXl, boxYb, boxXr, boxYt, moveXl, move
         return true;
 }
 
+Geometry.vectorMagnitude = function(dx, dy) {
+    return Math.sqrt(dx * dx + dy * dy);
+}
 
 Geometry.distance = function(x1, y1, x2, y2) {
     return Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+}
+
+Geometry.distanceSquared = function(x1, y1, x2, y2) {
+    return (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
 }
 
 Geometry.unitVec = function(vec) {
@@ -90,8 +100,50 @@ Geometry.crossProduct = function(v1x, v1y, v1z, v2x, v2y, v2z) {
     };
 }
 
+Geometry.distancePointLineSegment = function(p, p1, p2) {
+    var Mx = p2.x - p1.x;
+    var My = p2.y - p1.y;
+    
+    var P_Bx = p.x - p1.x;
+    var P_By = p.y - p1.y;
+    
+    var t0 = (Mx * P_Bx + My * P_By) / (Mx * Mx + My * My);
+    
+    if(t0 <= 0) {
+        return Geometry.distance(p.x, p.y, p1.x, p1.y);
+    } else if(t0 < 1) {
+        var nearest_x = p1.x + t0 * Mx;
+        var nearest_y = p1.y + t0 * My;
+        return Geometry.distance(p.x, p.y, nearest_x, nearest_y);
+    } else {
+        return Geometry.distance(p.x, p.y, p2.x, p2.y);
+    }
+}
+
 Geometry.fixAngle = function(a) {
     return a - 2 * Math.PI * Math.floor(a / (2 * Math.PI)); //Floored division
+}
+
+Geometry.rotateAngle = function(angle, targetRotation, rotationSpeed) {
+	if(Math.abs(targetRotation) <= rotationSpeed) {
+        return {
+		    angle: Geometry.fixAngle(angle + targetRotation),
+		    matchAngle: true
+        };
+	} else {
+        return {
+		    angle: Geometry.fixAngle(angle + rotationSpeed * Math.sign(targetRotation)),
+		    matchAngle: false
+        };
+        
+	}
+}
+
+Geometry.getTargetRotation = function(dx, dy, rotation) {
+	var rotatedDx = dx * Math.cos(-rotation) - dy * Math.sin(-rotation);
+	var rotatedDy = dx * Math.sin(-rotation) + dy * Math.cos(-rotation);
+	var targetRotation = Math.atan2(rotatedDy, rotatedDx);
+    return targetRotation;
 }
 
 //a1,a2: the angles. Must be in the range [0, 2 pi)
@@ -108,4 +160,17 @@ Geometry.interpolateAngle = function(a1, a2, t) {
 
 Geometry.interpolatePosition = function(p1, p2, t) {
     return {x: p1.x * (1 - t) + p2.x * t, y: p1.y * (1 - t) + p2.y * t};
+}
+
+Geometry.pointCanBeReached = function(dx, dy, angle, speed, rotationSpeed) {
+	var mag = Geometry.vectorMagnitude(dx, dy);
+	var rotatedDx = dx * Math.cos(-angle) - dy * Math.sin(-angle);
+	var rotatedDy = dx * Math.sin(-angle) + dy * Math.cos(-angle);
+	var targetAngle = Math.atan2(rotatedDy, rotatedDx);
+	
+	var FUDGE_FACTOR = 1.1;
+	
+    var turnRadius = speed / rotationSpeed;
+	
+	return (mag > 2 * turnRadius *  Math.abs(Math.sin(targetAngle)) * FUDGE_FACTOR);
 }

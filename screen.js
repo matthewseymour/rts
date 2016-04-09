@@ -14,6 +14,13 @@ ScreenLayout.right = 0;
 
 ScreenLayout.onResize = [];
 
+function positionInMapView(position) {
+    return position.x > ScreenLayout.sideBarRight;
+}
+
+function forcePositionInMapView(position) {
+    position.x = Math.max(position.x, ScreenLayout.sideBarRight);
+}
 
 function resizeCanvas() {
     var height = document.body.offsetHeight;
@@ -29,9 +36,13 @@ function resizeCanvas() {
     
     ScreenLayout.sideBarRight = ScreenLayout.left + SIDE_BAR_WIDTH;
     
+    ScreenLayout.centerVertical = (ScreenLayout.top + ScreenLayout.bottom) / 2;
+    ScreenLayout.centerHorizontal = (ScreenLayout.left + ScreenLayout.right) / 2;
+    
     for(var func of ScreenLayout.onResize) {
         func();
     }
 }
+
 window.addEventListener('resize', resizeCanvas, false);
 resizeCanvas();

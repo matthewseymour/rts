@@ -1,2 +1,5 @@
 convert -crop 4x1@ medtankbase.png "medtankbase_%d.png"
 convert -crop 4x1@ medtankturret.png "medtankturret_%d.png"
+convert -crop 4x1@ excavator.png "excavator_%d.png"
+convert -crop 4x1@ heavytankbase.png "heavytankbase_%d.png"
+convert -crop 4x1@ heavytankturret.png "heavytankturret_%d.png"

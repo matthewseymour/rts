@@ -46,20 +46,17 @@ function genTestHeightMap(graphicsPrograms, fftProgs, stages, scale, reduceFacto
     //u_3 magnitude of angular factor
     //u_4 magnitude of isotropic factor 
     var shapeNoise = Compute.buildCustomProgram(fftProgs.gl, `
-        float kMag = sqrt(k.x * k.x + k.y * k.y);
+        float kMag = length(k);
         float mag;
         float angularFactor;
         if(kMag < 0.002) { //Sets the feature length scale
-            angularFactor = 0.0;
+            mag = 0.0;
         } else {
-            float dir_x = u_1;
-            float dir_y = u_2;
-            float cosAngle = (k.x * dir_x + k.y * dir_y) / kMag;
+            vec2 dir = vec2(u_1, u_2);
+            float cosAngle = dot(k, dir) / kMag;
             angularFactor = cosAngle * u_3 + u_4;
-            //mag = angularFactor / pow(kMag * 110.0 * 1.0, 1.7);
+            mag = 0.1 * angularFactor * pow(2.0 * 8.0, 1.7) / pow(kMag * 2.0 * 110.0 * 8.0, 1.7);
         }  
-        //mag = 0.1 * angularFactor * pow(2.0 * 8.0, 1.7) / (1.0 + pow(kMag * 2.0 * 110.0 * 8.0, 1.7));
-        mag = 0.1 * angularFactor * pow(2.0 * 8.0, 1.7) / pow(kMag * 2.0 * 110.0 * 8.0, 1.7);
         b = a * mag;
         `
     );
@@ -352,7 +349,7 @@ function generateGeometry(heightBufferPixels, scaling, N, triangles, normals, ra
     
     
     //The floor:
-    var TR = 2 * (N / 1024); //Texture repeat. 
+    var TR = 3 * (N / 1024); //Texture repeat. 
     //The "floor"
     var floorTris = [];
     var floorNormals = [];
@@ -499,7 +496,8 @@ function drawOntoBuffer(feature, buffer, shadowBuffer, sandTexture, lightViewMat
 }
 
 
-function makeSandTexture(size, scale, scaleSpeckle, speckleDiff, green, blue) {
+function makeSandTexture(fftProgs, size, scale, scaleSpeckle, speckleDiff, brightness, green, blue) {
+    var gl = fftProgs.gl;
     var buffer1 = largeNoise(graphicsPrograms, fftProgs, size);
     var buffer3 = Compute.makeComputeBuffer(gl, size, size);
     var buffer4 = Compute.makeComputeBuffer(gl, size, size);
@@ -521,7 +519,7 @@ function makeSandTexture(size, scale, scaleSpeckle, speckleDiff, green, blue) {
         `
     );
     
-    Compute.runCustomProgram(fftProgs.gl, mapColor, buffer3, bufferOut, 1, green, blue);
+    Compute.runCustomProgram(fftProgs.gl, mapColor, buffer3, bufferOut, brightness, green * brightness, blue * brightness);
     
     return textureOut;
 }
@@ -529,12 +527,14 @@ function makeSandTexture(size, scale, scaleSpeckle, speckleDiff, green, blue) {
 function genMap(fftProgs, size) {
     
     
-    const sandscale = 0.0375;
+    //const sandscale = 0.0375;
+    const sandscale = 0.05;
     const sandcalespeckle = -1.2;
     const speckleDiff = 1.5;
+    const sandBrightness = 1.2;
     const sandgreen = .95;
     const sandblue = .48;
-    var sandTexture = makeSandTexture(1024, sandscale, sandcalespeckle, speckleDiff, sandgreen, sandblue);
+    var sandTexture = makeSandTexture(fftProgs, 1024, sandscale, sandcalespeckle, speckleDiff, sandBrightness, sandgreen, sandblue);
 
 
 
@@ -608,7 +608,8 @@ function genMap(fftProgs, size) {
                             var newFeature = generateGeometry(info.heightBufferPixels, scaling, mapSize, trianglesTempBuffer, normalsTempBuffer, range);
                             newFeature.x = (range.colEnd + range.colStart) / mapSize - 1;
                             newFeature.y = (range.rowEnd + range.rowStart) / mapSize - 1;
-                            newFeature.color = [.5,.5,.25, 1];
+                            //newFeature.color = [.5,.5,.25, 1];
+                            newFeature.color = [.54,.48,.25, 1];
                             features.push(newFeature);
                             if(i == col && j == row)
                                 toDraw = newFeature;

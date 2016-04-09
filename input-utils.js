@@ -1,12 +1,13 @@
 "use strict";
 
 const MouseClickEnum = {
-	left: 1,
-	middle: 2,
-	right: 3
+	none: -1,
+	left: 0,
+	middle: 1,
+	right: 2
 };
 
-const keyStateEnum = {
+const KeyStateEnum = {
     KEY_DOWN: 1,
     KEY_UP: 2
 };

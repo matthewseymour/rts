@@ -160,7 +160,7 @@ function drawNodeListView(graphicsPrograms, nodeListView, view) {
     var offsetScale = convertToScreen({x: 1, y: 1}, view);
     
     Graphics.drawLines(graphicsPrograms, nodeListView.buffer, nodeListView.numLines, 
-        offset.x, offset.y, offsetScale.x - offset.x, offsetScale.y - offset.y, [1,1,1,.25]);
+        offset.x, offset.y, offsetScale.x - offset.x, offsetScale.y - offset.y, [1,1,1,.125]);
     
 }
 
@@ -202,8 +202,10 @@ function checkCollision(store, ignore, x1, y1, x2, y2, size) {
     
 
 
-    for(var box of store) {
-        if(box == ignore)
+    var box;
+    for(var i = 0; i < store.length; i++) {
+        box = store[i];
+        if(box === ignore)
             continue;
         if(Geometry.boxMoveBoxCollision(box.x - box.size, box.y - box.size, box.x + box.size, box.y + box.size, xLeft, yBot, xRight, yTop, dx, dy)) {
             return true;

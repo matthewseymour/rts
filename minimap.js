@@ -1,8 +1,27 @@
 "use strict";
 
+function drawMiniMapViewPort(graphicsPrograms, view) {
+    var screenView = getViewWindow(view);
+    
+    var topLeft = convertWorldToMinimap({x: screenView.left, y: screenView.top}, view);
+    var bottomRight = convertWorldToMinimap({x: screenView.right, y: screenView.bottom}, view);
+    
+    var coords = {
+        left: Math.floor(topLeft.x),
+        right: Math.ceil(bottomRight.x),
+        top: Math.floor(topLeft.y),
+        bottom: Math.ceil(bottomRight.y)
+    };
+    
+    var screenViewColor = [1,1,1,.75];
+    Graphics.drawLine(graphicsPrograms, coords.left, coords.bottom, coords.right, coords.bottom, screenViewColor);
+    Graphics.drawLine(graphicsPrograms, coords.right, coords.bottom, coords.right, coords.top, screenViewColor);
+    Graphics.drawLine(graphicsPrograms, coords.right, coords.top, coords.left, coords.top, screenViewColor);
+    Graphics.drawLine(graphicsPrograms, coords.left, coords.top, coords.left, coords.bottom, screenViewColor);
+    
+}
 
-
-function drawMiniMap(graphicsPrograms, miniMap, view) {
+function drawMiniMap(graphicsPrograms, miniMap) {
     
     var miniMapWidth = miniMap.miniMapBuffer.width;
     var miniMapHeight = miniMap.miniMapBuffer.height;
@@ -17,20 +36,6 @@ function drawMiniMap(graphicsPrograms, miniMap, view) {
         miniMap.miniMapBuffer, 
         [1,1,1,1]);
         
-    var screenView = getViewWindow(view);
-    
-    var coords = {
-        left: Math.floor(screenView.left * miniMapWidth / view.worldWidth + (ScreenLayout.miniMapLeft + 1)),
-        right: Math.ceil(screenView.right * miniMapWidth / view.worldWidth + (ScreenLayout.miniMapLeft + 1)),
-        top: Math.floor(screenView.top * miniMapHeight / view.worldHeight + ScreenLayout.miniMapTop - (miniMapHeight + 1) + 1),
-        bottom: Math.ceil(screenView.bottom * miniMapHeight / view.worldHeight + ScreenLayout.miniMapTop - (miniMapHeight + 1) + 1)
-    };
-    
-    var screenViewColor = [1,1,1,.75];
-    Graphics.drawLine(graphicsPrograms, coords.left, coords.bottom, coords.right, coords.bottom, screenViewColor);
-    Graphics.drawLine(graphicsPrograms, coords.right, coords.bottom, coords.right, coords.top, screenViewColor);
-    Graphics.drawLine(graphicsPrograms, coords.right, coords.top, coords.left, coords.top, screenViewColor);
-    Graphics.drawLine(graphicsPrograms, coords.left, coords.top, coords.left, coords.bottom, screenViewColor);
     
 
 }

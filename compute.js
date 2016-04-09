@@ -8,64 +8,64 @@ Compute.FFT_DIRECTIONS = {FORWARD: 1, BACKWARD: 2};
 
 
 Compute.getPrograms = function(gl) {
-    var fftProgs = {};
+    var computeProgs = {};
     
-    fftProgs.gl = gl;
+    computeProgs.gl = gl;
     
-    fftProgs.unitRectBuffer = glUtils.generateSimpleUnitRectangleBuffer(gl);
+    computeProgs.unitRectBuffer = glUtils.generateSimpleUnitRectangleBuffer(gl);
     
     
 
     
-    fftProgs.transformProgramInfo = glUtils.makeProgram(
+    computeProgs.transformProgramInfo = glUtils.makeProgram(
         gl, computeVertexSource, transposeFragmentSource, 
         ["a_position", "a_texCoord"], 
         ["u_image", "u_transpose"]
     );
 
-    fftProgs.scaleProgramInfo = glUtils.makeProgram(
+    computeProgs.scaleProgramInfo = glUtils.makeProgram(
         gl, computeVertexSource, scaleFragmentSource, 
         ["a_position", "a_texCoord"], 
         ["u_image", "u_scale"]
     );
 
-    fftProgs.bitReverseProgramInfo = glUtils.makeProgram(
+    computeProgs.bitReverseProgramInfo = glUtils.makeProgram(
         gl, computeVertexSource, bitReverseFragmentSource, 
         ["a_position", "a_texCoord"], 
         ["u_image", "u_bitReverse", "u_n"]
     );
 
-    fftProgs.stageProgramInfo = glUtils.makeProgram(
+    computeProgs.stageProgramInfo = glUtils.makeProgram(
         gl, computeVertexSource, stageFragmentSource, 
         ["a_position", "a_texCoord"], 
         ["u_image", "u_twiddleRead", "u_numStages", "u_n", "u_stage", "u_reduce"]
     );
 
-    fftProgs.colorMapProgramInfo = glUtils.makeProgram(
+    computeProgs.colorMapProgramInfo = glUtils.makeProgram(
         gl, computeVertexSource, colorMapFragmentSource, 
         ["a_position", "a_texCoord"], 
         ["u_image_0", "u_image_1", "u_image_2", "u_colorMap"]
     );
 
-    fftProgs.bicubicProgramInfo = glUtils.makeProgram(
+    computeProgs.bicubicProgramInfo = glUtils.makeProgram(
         gl, computeVertexSource, bicubicFragmentSource, 
         ["a_position", "a_texCoord"], 
         ["u_image", "u_size"]
     );
 
-    fftProgs.gradientProgramInfo = glUtils.makeProgram(
+    computeProgs.gradientProgramInfo = glUtils.makeProgram(
         gl, computeVertexSource, gradientFragmentSource, 
         ["a_position", "a_texCoord"], 
         ["u_image", "u_size", "u_gradVec", "u_dist"]
     );
     
-    fftProgs.noiseProgramInfo = glUtils.makeProgram(
+    computeProgs.noiseProgramInfo = glUtils.makeProgram(
         gl, computeVertexSource, noiseFragmentSource, 
         ["a_position", "a_texCoord"], 
         ["u_seed"]
     );
     
-    fftProgs.gaussianNoiseProgramInfo = glUtils.makeProgram(
+    computeProgs.gaussianNoiseProgramInfo = glUtils.makeProgram(
         gl, computeVertexSource, gaussianNoiseFragmentSource, 
         ["a_position", "a_texCoord"], 
         ["u_seed", "u_scale"]
@@ -73,7 +73,7 @@ Compute.getPrograms = function(gl) {
     
     
     
-    return fftProgs;
+    return computeProgs;
 }
 
 Compute.makeComputeBuffer = function(gl, width, height) {
@@ -122,7 +122,7 @@ Compute.buildReduceProgram = function(gl, code) {
 
 
 
-Compute.makePlan = function(fftProgs, stages, direction, reduce) {
+Compute.makePlan = function(computeProgs, stages, direction, reduce) {
     var N = 1 << stages;
     
     var reduceFactor = Math.pow(reduce, 1 / stages);
@@ -197,8 +197,8 @@ Compute.makePlan = function(fftProgs, stages, direction, reduce) {
     
 }
 
-Compute.computeFft = function(fftProgs, fftPlan, data, outputFrameBuffer, tempFrameBuffer) {
-    var gl = fftProgs.gl;
+Compute.computeFft = function(computeProgs, fftPlan, data, outputFrameBuffer, tempFrameBuffer) {
+    var gl = computeProgs.gl;
     var stages = fftPlan.stages;
     var size = fftPlan.N;
     
@@ -208,12 +208,12 @@ Compute.computeFft = function(fftProgs, fftPlan, data, outputFrameBuffer, tempFr
 
     function bitReverse(inputBuffer, outputBuffer) {
         //Bit reverse step:
-    	gl.useProgram(fftProgs.bitReverseProgramInfo.program);
+    	gl.useProgram(computeProgs.bitReverseProgramInfo.program);
     
         gl.bindFramebuffer(gl.FRAMEBUFFER, outputBuffer.frameBuffer);
         gl.viewport(0, 0, size, size); 
     
-        glUtils.bindRectBuffer(gl, fftProgs.bitReverseProgramInfo, fftProgs.unitRectBuffer);
+        glUtils.bindRectBuffer(gl, computeProgs.bitReverseProgramInfo, computeProgs.unitRectBuffer);
 
         gl.activeTexture(gl.TEXTURE0);
     	gl.bindTexture(gl.TEXTURE_2D, inputBuffer.texture);
@@ -221,9 +221,9 @@ Compute.computeFft = function(fftProgs, fftPlan, data, outputFrameBuffer, tempFr
         gl.activeTexture(gl.TEXTURE1);
     	gl.bindTexture(gl.TEXTURE_2D, fftPlan.bitReverse.texture);
 
-    	fftProgs.bitReverseProgramInfo.setters.u_image(0);
-    	fftProgs.bitReverseProgramInfo.setters.u_bitReverse(1);
-    	fftProgs.bitReverseProgramInfo.setters.u_n(size);
+    	computeProgs.bitReverseProgramInfo.setters.u_image(0);
+    	computeProgs.bitReverseProgramInfo.setters.u_bitReverse(1);
+    	computeProgs.bitReverseProgramInfo.setters.u_n(size);
     
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
@@ -255,24 +255,24 @@ Compute.computeFft = function(fftProgs, fftPlan, data, outputFrameBuffer, tempFr
     
     
     function transform(direction) {
-    	gl.useProgram(fftProgs.stageProgramInfo.program);
+    	gl.useProgram(computeProgs.stageProgramInfo.program);
     
-        glUtils.bindRectBuffer(gl, fftProgs.stageProgramInfo, fftProgs.unitRectBuffer);
+        glUtils.bindRectBuffer(gl, computeProgs.stageProgramInfo, computeProgs.unitRectBuffer);
     
         gl.activeTexture(gl.TEXTURE1);
     	gl.bindTexture(gl.TEXTURE_2D, fftPlan.twiddleRead.texture);
         
-    	fftProgs.stageProgramInfo.setters.u_image(0);
-    	fftProgs.stageProgramInfo.setters.u_twiddleRead(1);
-    	fftProgs.stageProgramInfo.setters.u_reduce(fftPlan.reduce);
-    	fftProgs.stageProgramInfo.setters.u_numStages(stages);
-    	fftProgs.stageProgramInfo.setters.u_n(size);
+    	computeProgs.stageProgramInfo.setters.u_image(0);
+    	computeProgs.stageProgramInfo.setters.u_twiddleRead(1);
+    	computeProgs.stageProgramInfo.setters.u_reduce(fftPlan.reduce);
+    	computeProgs.stageProgramInfo.setters.u_numStages(stages);
+    	computeProgs.stageProgramInfo.setters.u_n(size);
         
         for(var i = 0; i < stages; i++) {
             gl.activeTexture(gl.TEXTURE0);
         	gl.bindTexture(gl.TEXTURE_2D, getFromBuffer(direction).texture);
             
-        	fftProgs.stageProgramInfo.setters.u_stage(i);
+        	computeProgs.stageProgramInfo.setters.u_stage(i);
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, getToBuffer(direction).frameBuffer);
         	
@@ -292,18 +292,18 @@ Compute.computeFft = function(fftProgs, fftPlan, data, outputFrameBuffer, tempFr
         var bufferIn = getFromBuffer(direction);
         var bufferOut = getToBuffer(direction);
 
-    	gl.useProgram(fftProgs.transformProgramInfo.program);
+    	gl.useProgram(computeProgs.transformProgramInfo.program);
     
         gl.bindFramebuffer(gl.FRAMEBUFFER, bufferOut.frameBuffer);
         gl.viewport(0, 0, size, size); 
     
-        glUtils.bindRectBuffer(gl, fftProgs.transformProgramInfo, fftProgs.unitRectBuffer);
+        glUtils.bindRectBuffer(gl, computeProgs.transformProgramInfo, computeProgs.unitRectBuffer);
 
         gl.activeTexture(gl.TEXTURE0);
     	gl.bindTexture(gl.TEXTURE_2D, bufferIn.texture);
     
-        fftProgs.transformProgramInfo.setters.u_image(0);
-        fftProgs.transformProgramInfo.setters.u_transpose(straightCopy ? 0 : 1);
+        computeProgs.transformProgramInfo.setters.u_image(0);
+        computeProgs.transformProgramInfo.setters.u_transpose(straightCopy ? 0 : 1);
     
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -327,15 +327,15 @@ Compute.computeFft = function(fftProgs, fftPlan, data, outputFrameBuffer, tempFr
         transpose(dir, true);
 }
 
-Compute.colorMap = function(fftProgs, colorMap, inputBuffer, outputBuffer) {
-    var gl = fftProgs.gl;
+Compute.colorMap = function(computeProgs, colorMap, inputBuffer, outputBuffer) {
+    var gl = computeProgs.gl;
 	
-    gl.useProgram(fftProgs.colorMapProgramInfo.program);
+    gl.useProgram(computeProgs.colorMapProgramInfo.program);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputBuffer.frameBuffer);
     gl.viewport(0, 0, outputBuffer.width, outputBuffer.height); 
 
-    glUtils.bindRectBuffer(gl, fftProgs.colorMapProgramInfo, fftProgs.unitRectBuffer);
+    glUtils.bindRectBuffer(gl, computeProgs.colorMapProgramInfo, computeProgs.unitRectBuffer);
 
     gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, inputBuffer.texture);
@@ -343,98 +343,98 @@ Compute.colorMap = function(fftProgs, colorMap, inputBuffer, outputBuffer) {
     gl.activeTexture(gl.TEXTURE1);
 	gl.bindTexture(gl.TEXTURE_2D, colorMap.texture);
 
-    fftProgs.colorMapProgramInfo.setters.u_image(0);
-    fftProgs.colorMapProgramInfo.setters.u_colorMap(1);
+    computeProgs.colorMapProgramInfo.setters.u_image(0);
+    computeProgs.colorMapProgramInfo.setters.u_colorMap(1);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-Compute.scale = function(fftProgs, scaleFactor, inputBuffer, outputBuffer) {
-    var gl = fftProgs.gl;
+Compute.scale = function(computeProgs, scaleFactor, inputBuffer, outputBuffer) {
+    var gl = computeProgs.gl;
 	
-    gl.useProgram(fftProgs.scaleProgramInfo.program);
+    gl.useProgram(computeProgs.scaleProgramInfo.program);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputBuffer.frameBuffer);
     gl.viewport(0, 0, outputBuffer.width, outputBuffer.height); 
 
-    glUtils.bindRectBuffer(gl, fftProgs.scaleProgramInfo, fftProgs.unitRectBuffer);
+    glUtils.bindRectBuffer(gl, computeProgs.scaleProgramInfo, computeProgs.unitRectBuffer);
 
     gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, inputBuffer.texture);
 
-    fftProgs.scaleProgramInfo.setters.u_image(0);
-    fftProgs.scaleProgramInfo.setters.u_scale(scaleFactor);
+    computeProgs.scaleProgramInfo.setters.u_image(0);
+    computeProgs.scaleProgramInfo.setters.u_scale(scaleFactor);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-Compute.bicubic = function(fftProgs, inputBuffer, outputBuffer) {
-    var gl = fftProgs.gl;
+Compute.bicubic = function(computeProgs, inputBuffer, outputBuffer) {
+    var gl = computeProgs.gl;
 	
-    gl.useProgram(fftProgs.bicubicProgramInfo.program);
+    gl.useProgram(computeProgs.bicubicProgramInfo.program);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputBuffer.frameBuffer);
     gl.viewport(0, 0, outputBuffer.width, outputBuffer.height); 
 
-    glUtils.bindRectBuffer(gl, fftProgs.bicubicProgramInfo, fftProgs.unitRectBuffer);
+    glUtils.bindRectBuffer(gl, computeProgs.bicubicProgramInfo, computeProgs.unitRectBuffer);
 
     gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, inputBuffer.texture);
 
-    fftProgs.bicubicProgramInfo.setters.u_image(0);
-    fftProgs.bicubicProgramInfo.setters.u_size([inputBuffer.width, inputBuffer.height]);
+    computeProgs.bicubicProgramInfo.setters.u_image(0);
+    computeProgs.bicubicProgramInfo.setters.u_size([inputBuffer.width, inputBuffer.height]);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-Compute.gradient = function(fftProgs, directionVector, dist, inputBuffer, outputBuffer) {
-    var gl = fftProgs.gl;
+Compute.gradient = function(computeProgs, directionVector, dist, inputBuffer, outputBuffer) {
+    var gl = computeProgs.gl;
 	
-    gl.useProgram(fftProgs.gradientProgramInfo.program);
+    gl.useProgram(computeProgs.gradientProgramInfo.program);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputBuffer.frameBuffer);
     gl.viewport(0, 0, outputBuffer.width, outputBuffer.height); 
 
-    glUtils.bindRectBuffer(gl, fftProgs.gradientProgramInfo, fftProgs.unitRectBuffer);
+    glUtils.bindRectBuffer(gl, computeProgs.gradientProgramInfo, computeProgs.unitRectBuffer);
 
     gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, inputBuffer.texture);
 
-    fftProgs.gradientProgramInfo.setters.u_image(0);
-    fftProgs.gradientProgramInfo.setters.u_size([inputBuffer.width, inputBuffer.height]);
-    fftProgs.gradientProgramInfo.setters.u_gradVec(directionVector);
-    fftProgs.gradientProgramInfo.setters.u_dist(dist);
+    computeProgs.gradientProgramInfo.setters.u_image(0);
+    computeProgs.gradientProgramInfo.setters.u_size([inputBuffer.width, inputBuffer.height]);
+    computeProgs.gradientProgramInfo.setters.u_gradVec(directionVector);
+    computeProgs.gradientProgramInfo.setters.u_dist(dist);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-Compute.noise = function(fftProgs, seed, outputBuffer) {
-    var gl = fftProgs.gl;
+Compute.noise = function(computeProgs, seed, outputBuffer) {
+    var gl = computeProgs.gl;
 	
-    gl.useProgram(fftProgs.noiseProgramInfo.program);
+    gl.useProgram(computeProgs.noiseProgramInfo.program);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputBuffer.frameBuffer);
     gl.viewport(0, 0, outputBuffer.width, outputBuffer.height); 
 
-    glUtils.bindRectBuffer(gl, fftProgs.noiseProgramInfo, fftProgs.unitRectBuffer);
+    glUtils.bindRectBuffer(gl, computeProgs.noiseProgramInfo, computeProgs.unitRectBuffer);
     
-    fftProgs.noiseProgramInfo.setters.u_seed(seed);
+    computeProgs.noiseProgramInfo.setters.u_seed(seed);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-Compute.gaussianNoise = function(fftProgs, seed, scale, outputBuffer) {
-    var gl = fftProgs.gl;
+Compute.gaussianNoise = function(computeProgs, seed, scale, outputBuffer) {
+    var gl = computeProgs.gl;
 	
-    gl.useProgram(fftProgs.gaussianNoiseProgramInfo.program);
+    gl.useProgram(computeProgs.gaussianNoiseProgramInfo.program);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputBuffer.frameBuffer);
     gl.viewport(0, 0, outputBuffer.width, outputBuffer.height); 
 
-    glUtils.bindRectBuffer(gl, fftProgs.gaussianNoiseProgramInfo, fftProgs.unitRectBuffer);
+    glUtils.bindRectBuffer(gl, computeProgs.gaussianNoiseProgramInfo, computeProgs.unitRectBuffer);
     
-    fftProgs.gaussianNoiseProgramInfo.setters.u_seed(seed);
-    fftProgs.gaussianNoiseProgramInfo.setters.u_scale(scale);
+    computeProgs.gaussianNoiseProgramInfo.setters.u_seed(seed);
+    computeProgs.gaussianNoiseProgramInfo.setters.u_scale(scale);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
@@ -465,8 +465,8 @@ Compute.runCustomProgram = function(gl, programInfo, inputBuffer, outputBuffer, 
     if(u_4 !== undefined)
         programInfo.setters.u_4(u_4);
     
-        
-
+    programInfo.setters.u_size([inputBuffer.width, inputBuffer.height]);
+    
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
@@ -531,6 +531,7 @@ Compute.runCustomProgram2 = function(gl, programInfo, inputBuffer0, inputBuffer1
     if(u_4 !== undefined)
         programInfo.setters.u_3(u_4);
     
+    programInfo.setters.u_size([inputBuffer0.width, inputBuffer0.height]);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }

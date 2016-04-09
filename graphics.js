@@ -1,9 +1,10 @@
 const Graphics = {};
 
 
-Graphics.getGraphicsPrograms = function(gl) {
+Graphics.getGraphicsPrograms = function(gl, instancedArraysExtension) {
     var graphicsPrograms = {};
     graphicsPrograms.gl = gl;
+    graphicsPrograms.instancedArraysExtension = instancedArraysExtension;
     graphicsPrograms.resolution = {width: 0, height: 0};
     
     graphicsPrograms.unitRectBuffer = glUtils.generateSimpleUnitRectangleBuffer(gl);
@@ -22,27 +23,46 @@ Graphics.getGraphicsPrograms = function(gl) {
     graphicsPrograms.primitiveProgramInfo = glUtils.makeProgram(
         gl, primitiveVertexSource, primitiveFragmentSource, 
         ["a_position"], 
-        ["u_resolution", "u_position", "u_size", "u_color"]
+        []
+    );
+
+    graphicsPrograms.primitiveInstancedProgramInfo = glUtils.makeProgram(
+        gl, primitiveInstancedVertexSource, primitiveColorFragmentSource, 
+        ["a_position", "a_color", "a_alpha", "a_offset"], 
+        []
     );
 
     graphicsPrograms.imageProgramInfo = glUtils.makeProgram(
         gl, imageVertexSource, imageFragmentSource, 
         ["a_position", "a_texCoord"], 
-        ["u_image", "u_mask", "u_resolution", "u_position", "u_size", "u_texResolution", "u_texPosition", "u_texSize"]
+        []
     );
 
     graphicsPrograms.imageDepthProgramInfo = glUtils.makeProgram(
         gl, imageDepthVertexSource, imageDepthFragmentSource, 
         ["a_position", "a_texCoord", "a_depthTexCoord"], 
-        ["u_image", "u_mask", "u_resolution", "u_position", "u_size", "u_texResolution", "u_texPosition", "u_texSize", "u_depthTexResolution", "u_depthTexPosition", "u_depthTexSize", "u_depthImage", "u_depth"]
+        []
     );
+    
+    graphicsPrograms.spriteTeamDepthProgramInfo = glUtils.makeProgram(
+        gl, spriteTeamDepthVertexSource, spriteTeamDepthFragmentSource, 
+        ["a_position", "a_texCoord", "a_depthTexCoord"], 
+        []
+    );
+    
 
     graphicsPrograms.imageMaskProgramInfo = glUtils.makeProgram(
         gl, imageMaskVertexSource, imageMaskFragmentSource, 
         ["a_position", "a_texCoord"], 
-        ["u_image", "u_mask", "u_resolution", "u_position", "u_size", "u_texResolution", 
-         "u_texPosition", "u_texSize", "u_maskTexResolution", "u_maskTexPosition", "u_maskTexSize"]
+        []
     );
+    
+    graphicsPrograms.spriteEdgeDetectProgramInfo = glUtils.makeProgram(
+        gl, imageVertexSource, spriteEdgeDetectFragmentSource, 
+        ["a_position", "a_texCoord"], 
+        []
+    );
+    
     
     graphicsPrograms.primitive3dProgramInfo = glUtils.makeProgram(
         gl, primitive3dVertexSource, primitive3dFragmentSource, 
@@ -82,6 +102,43 @@ Graphics.drawBox = function(programs, x, y, w, h, color) {
 	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 	
 }
+
+Graphics.drawTrianglesInstanced = function(programs, trisBuffer, offsetsBuffer, colorsBuffer, alphasBuffer, numTris, numInstances) {
+    var gl = programs.gl;
+	gl.useProgram(programs.primitiveInstancedProgramInfo.program);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, trisBuffer);
+	gl.vertexAttribPointer(programs.primitiveInstancedProgramInfo.attribsUniforms.a_position, 2, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(programs.primitiveInstancedProgramInfo.attribsUniforms.a_position);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, colorsBuffer);
+	gl.vertexAttribPointer(programs.primitiveInstancedProgramInfo.attribsUniforms.a_color, 3, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(programs.primitiveInstancedProgramInfo.attribsUniforms.a_color);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, offsetsBuffer);
+    gl.vertexAttribPointer(programs.primitiveInstancedProgramInfo.attribsUniforms.a_offset, 2, gl.FLOAT, false, 0, 0); 
+    gl.enableVertexAttribArray(programs.primitiveInstancedProgramInfo.attribsUniforms.a_offset);
+    programs.instancedArraysExtension.vertexAttribDivisorANGLE(programs.primitiveInstancedProgramInfo.attribsUniforms.a_offset, 1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, alphasBuffer);
+    gl.vertexAttribPointer(programs.primitiveInstancedProgramInfo.attribsUniforms.a_alpha, 1, gl.FLOAT, false, 0, 0); 
+    gl.enableVertexAttribArray(programs.primitiveInstancedProgramInfo.attribsUniforms.a_alpha);
+    programs.instancedArraysExtension.vertexAttribDivisorANGLE(programs.primitiveInstancedProgramInfo.attribsUniforms.a_alpha, 1);
+
+
+
+
+    programs.primitiveInstancedProgramInfo.setters.u_resolution([programs.resolution.width, programs.resolution.height]);
+	
+	//draw
+    programs.instancedArraysExtension.drawArraysInstancedANGLE(gl.TRIANGLES, 0, numTris * 3, numInstances);
+
+    programs.instancedArraysExtension.vertexAttribDivisorANGLE(programs.primitiveInstancedProgramInfo.attribsUniforms.a_offset, 0);
+    programs.instancedArraysExtension.vertexAttribDivisorANGLE(programs.primitiveInstancedProgramInfo.attribsUniforms.a_alpha,  0);
+    
+	
+}
+
 
 Graphics.drawLine = function(programs, x1, y1, x2, y2, color) {
     var gl = programs.gl;
@@ -139,6 +196,33 @@ Graphics.drawImage = function(programs, sx, sy, sw, sh, x, y, w, h, image, mask)
 	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 	
 }
+
+
+Graphics.drawSpriteEdgeDetect = function(programs, sx, sy, sw, sh, x, y, w, h, image, threshold) {
+    var gl = programs.gl;
+	gl.useProgram(programs.spriteEdgeDetectProgramInfo.program);
+	
+    glUtils.bindRectBuffer(gl, programs.spriteEdgeDetectProgramInfo, programs.unitRectBuffer);
+
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, image.texture);
+
+    programs.spriteEdgeDetectProgramInfo.setters.u_resolution([programs.resolution.width, programs.resolution.height]);
+	programs.spriteEdgeDetectProgramInfo.setters.u_position([x, y]);
+	programs.spriteEdgeDetectProgramInfo.setters.u_size([w, h]);
+	programs.spriteEdgeDetectProgramInfo.setters.u_image(0);
+	programs.spriteEdgeDetectProgramInfo.setters.u_texResolution([image.width, image.height]);
+	programs.spriteEdgeDetectProgramInfo.setters.u_texPosition([sx, sy]);
+	programs.spriteEdgeDetectProgramInfo.setters.u_texSize([sw, sh]);
+	programs.spriteEdgeDetectProgramInfo.setters.u_sizeFragment([image.width, image.height]);
+	programs.spriteEdgeDetectProgramInfo.setters.u_threshold(threshold);
+    
+	
+	//draw
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+	
+}
+
 
 //The mask is another image
 Graphics.drawImageMask = function(programs, sx, sy, sw, sh, mx, my, mw, mh, x, y, w, h, image, mask) {
@@ -206,6 +290,53 @@ Graphics.drawImageDepth = function(programs, sx, sy, sw, sh, dx, dy, dw, dh, x, 
 	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 	
 }
+
+Graphics.drawSpriteTeamDepth = function(programs, sx, sy, sw, sh, stx, sty, dx, dy, dw, dh, x, y, w, h, depth, image, outline, depthImage, teamColors, outlineColor, mask) {
+    var gl = programs.gl;
+	gl.useProgram(programs.spriteTeamDepthProgramInfo.program);
+	
+    glUtils.bindRectBuffer(gl, programs.spriteTeamDepthProgramInfo, programs.unitRectBuffer);
+    
+	gl.bindBuffer(gl.ARRAY_BUFFER, programs.unitRectBuffer);
+    gl.vertexAttribPointer(programs.spriteTeamDepthProgramInfo.attribsUniforms.a_depthTexCoord, 2, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(programs.spriteTeamDepthProgramInfo.attribsUniforms.a_depthTexCoord);
+    
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, image.texture);
+
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, depthImage.texture);
+
+	gl.activeTexture(gl.TEXTURE2);
+	gl.bindTexture(gl.TEXTURE_2D, outline.texture);
+
+    programs.spriteTeamDepthProgramInfo.setters.u_resolution([programs.resolution.width, programs.resolution.height]);
+	programs.spriteTeamDepthProgramInfo.setters.u_position([x, y]);
+	programs.spriteTeamDepthProgramInfo.setters.u_size([w, h]);
+	programs.spriteTeamDepthProgramInfo.setters.u_image(0);
+	programs.spriteTeamDepthProgramInfo.setters.u_texResolution([image.width, image.height]);
+	programs.spriteTeamDepthProgramInfo.setters.u_texPosition([sx, sy]);
+	programs.spriteTeamDepthProgramInfo.setters.u_texTeamPosition([stx, sty]);
+	programs.spriteTeamDepthProgramInfo.setters.u_texSize([sw, sh]);
+
+	programs.spriteTeamDepthProgramInfo.setters.u_depthTexResolution([depthImage.width, depthImage.height]);
+	programs.spriteTeamDepthProgramInfo.setters.u_depthTexPosition([dx, dy]);
+	programs.spriteTeamDepthProgramInfo.setters.u_depthTexSize([dw, dh]);
+	programs.spriteTeamDepthProgramInfo.setters.u_depth(depth);
+	programs.spriteTeamDepthProgramInfo.setters.u_depthImage(1);
+	programs.spriteTeamDepthProgramInfo.setters.u_outline(2);
+	programs.spriteTeamDepthProgramInfo.setters.u_mask(mask);
+	programs.spriteTeamDepthProgramInfo.setters.u_teamColor1(teamColors[0]);
+	programs.spriteTeamDepthProgramInfo.setters.u_teamColor2(teamColors[1]);
+	programs.spriteTeamDepthProgramInfo.setters.u_teamColor3(teamColors[2]);
+	programs.spriteTeamDepthProgramInfo.setters.u_outlineColor(outlineColor);
+	
+    
+	//draw
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+	
+}
+
 
 Graphics.drawTriangles = function(programs, triangleBuffer, normalsBuffer, numberOfTriangles, matrixWorld, matrixCamera, color, zColor, lightDir, ambient) {
     var gl = programs.gl;

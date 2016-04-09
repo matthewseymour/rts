@@ -3,17 +3,23 @@
 <head>
 </head>
 <style type="text/css">
-	html,body { background:#fff; height:100%; margin:0; padding:0; overflow:hidden; background-color: #000000 }
-	canvas { position:absolute; top:0; left:0 }
+	html,body { background:#fff; height:100%; margin:0; padding:0; overflow:hidden; background-color: #000000; color: #FFFFFF}
+	canvas { position:absolute; top:20; left:0 }
 	#head { top:0; bottom:0px; }
 	#foot { top:0; bottom:0; }
 </style>
 <body>
+<div id="fps">  </div>
+
 <canvas id="canvas">Get a better browser</canvas>
 
 
 
 
+
+
+<script defer src=shader-vertex-particle.js   type="text/javascript"></script>
+<script defer src=shader-fragment-particle.js   type="text/javascript"></script>
 
 
 <script defer src=shader-include-packData.js             type="text/javascript"></script>
@@ -53,28 +59,12 @@
 <script defer src=shader-fragment-3d-texture-shadow.js   type="text/javascript"></script>
 
 
-<script defer src=input-utils.js type="text/javascript"></script>
-<script defer src=webgl-utils.js type="text/javascript"></script>
-<script defer src=my-gl-utils.js type="text/javascript"></script>
-<script defer src=screen.js      type="text/javascript"></script>
-<script defer src=matrix.js      type="text/javascript"></script>
-<script defer src=geometry.js    type="text/javascript"></script>
-<script defer src=view.js        type="text/javascript"></script>
-<script defer src=compute.js     type="text/javascript"></script>
+<script defer src=webgl-utils.js   type="text/javascript"></script>
+<script defer src=my-gl-utils.js   type="text/javascript"></script>
 <script defer src=graphics.js    type="text/javascript"></script>
-<script defer src=asset.js       type="text/javascript"></script>
-<script defer src=game.js        type="text/javascript"></script>
-<script defer src=bullet.js      type="text/javascript"></script>
-<script defer src=text.js        type="text/javascript"></script>
-<script defer src=pathfind.js    type="text/javascript"></script>
-<script defer src=mapObstacle.js type="text/javascript"></script>
-<script defer src=mapdesert.js   type="text/javascript"></script>
-<script defer src=minimap.js     type="text/javascript"></script>
-<script defer src=team.js        type="text/javascript"></script>
-<script defer src=unitTypes.js   type="text/javascript"></script>
-<script defer src=unit.js        type="text/javascript"></script>
-<script defer src=selectUnits.js type="text/javascript"></script>
-<script defer src=main.js        type="text/javascript"></script>
+<script defer src=compute.js    type="text/javascript"></script>
+<script defer src=matrix.js        type="text/javascript"></script>
+<script defer src=particleTest.js  type="text/javascript"></script>
 
 
 </body>

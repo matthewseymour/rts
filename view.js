@@ -1,3 +1,4 @@
+
 function convertToScreen(position, view){
     return {x: (position.x - view.xOffset) * SUB_TILE_WIDTH, y: (position.y - view.yOffset) * SUB_TILE_HEIGHT}
 }
@@ -5,6 +6,19 @@ function convertToScreen(position, view){
 function convertToWorld(position, view){
     return {x: position.x / SUB_TILE_WIDTH + view.xOffset, y: position.y / SUB_TILE_HEIGHT + view.yOffset}
 }
+
+
+function convertWorldToMinimap(position, view) {
+    return {
+        x: position.x * MINI_MAP_SIZE / view.worldWidth + (ScreenLayout.miniMapLeft + 1),
+        y: position.y * MINI_MAP_SIZE / view.worldHeight + ScreenLayout.miniMapTop - (MINI_MAP_SIZE + 1) + 1,
+    };
+}
+
+function convertMinimapToWorld(position) {
+    
+}
+
 
 function getViewWindow(view) {
     var xL = view.xOffset + ScreenLayout.sideBarRight / SUB_TILE_WIDTH;

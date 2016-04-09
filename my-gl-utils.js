@@ -77,6 +77,8 @@ glUtils.makeTextureFromImage = function(gl, image) {
     
     gl.bindTexture(gl.TEXTURE_2D, null);
     
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    
     return {texture: texture, width: image.width, height: image.height};
 }
 

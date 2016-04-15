@@ -23,6 +23,12 @@ var floatTextureExtension = gl.getExtension("OES_texture_float");
 if (!floatTextureExtension) {
     alert("float textures not supported");
 }
+
+var floatLinearExtension = gl.getExtension("OES_texture_float_linear");
+if (!floatLinearExtension) {
+    alert("float linear filtering textures not supported");
+}
+
 var depthTextureExtension = gl.getExtension("WEBGL_depth_texture");
 if (!depthTextureExtension) {
     alert("depth textures not supported");
@@ -46,6 +52,7 @@ ScreenLayout.onResize.push(changeScissorDims);
 
 var graphicsPrograms = Graphics.getGraphicsPrograms(gl, instancedArraysExtension);
 var computeProgs = Compute.getPrograms(gl);
+var particleProgs = Particle.getPrograms(gl);
 
 
 
@@ -81,7 +88,7 @@ function initAssets() {
 
 var assets = initAssets();
 var unitTypes = UnitTypes.getUnitTypes(assets);
-var game = Game.makeNewGame(computeProgs, 225, unitTypes);//375);
+var game = Game.makeNewGame(graphicsPrograms, computeProgs, particleProgs, 225, unitTypes);//375);
 
 var lastTime = 0;
 var timeAcc = 0;
@@ -319,7 +326,14 @@ function drawMapElements(graphicsPrograms, game, view, timeDiff, timeAccRatio) {
     
     Bullet.draw(game.bullets, timeAccRatio, view, graphicsPrograms);
     
+    Particle.drawExplosions(particleProgs, graphicsPrograms, view, game.explosionStore);
+    
     for(var i = 0; i < game.selectedUnits.length; i++) {
+        if(!game.selectedUnits[i].alive) {
+            game.selectedUnits.splice(i, 1);
+            i--;
+            continue;
+        }
         Unit.drawUnitSelected(game.selectedUnits[i], game.map, view, timeAccRatio, graphicsPrograms, viewOptions);
     }
     
@@ -398,6 +412,10 @@ function frame(timestamp) {
     } 
     
     
+    gl.disable(gl.BLEND);
+    if(!pause) {
+        Particle.updateExplosions(particleProgs, game.explosionStore);
+    }
     
       
     graphicsPrograms.gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -444,9 +462,11 @@ function frame(timestamp) {
     
     textWriters[16].writeTextRight(Math.round(fpsMeasure.lastFps.toString()) + " FPS", [1,1,1,1], ScreenLayout.right - 10, ScreenLayout.top - 10);
     textWriters[16].writeTextRight(UPDATE_PERIOD.toString() + " ms", [1,1,1,1], ScreenLayout.right - 10, ScreenLayout.top - 30);
+    textWriters[16].writeTextRight(game.explosionStore.explosions.length.toString() + " exps", [1,1,1,1], ScreenLayout.right - 10, ScreenLayout.top - 50);
     
-    if(pause)
+    if(pause) {
         textWriters[20].writeTextCenter("PAUSED", [1,1,1,1], ScreenLayout.centerHorizontal, ScreenLayout.centerVertical);
+    }
     
     requestAnimationFrame(frame);
 }

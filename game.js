@@ -4,7 +4,7 @@ const NUM_BULLETS = 1000;
 
 const Game = {};
 
-Game.makeNewGame = function(computeProgs, mapSize, unitTypes){
+Game.makeNewGame = function(graphicsProgs, computeProgs, particleProgs, mapSize, unitTypes){
     var gl = computeProgs.gl;
     var game = {};
     game.map = genMap(computeProgs, mapSize);
@@ -12,6 +12,8 @@ Game.makeNewGame = function(computeProgs, mapSize, unitTypes){
     
     game.bullets = Bullet.getBulletStore(NUM_BULLETS);
     Bullet.makeBulletVertexBuffer(gl, game.bullets);
+    
+    game.explosionStore = Particle.getExplosionStore(particleProgs, graphicsProgs, computeProgs);
     
     game.units = [];
     
@@ -25,7 +27,7 @@ Game.makeNewGame = function(computeProgs, mapSize, unitTypes){
     ];
     
     var teamInit = [
-        {unitType: UnitTypes.UnitTypeEnum.MEDIUM_TANK, number: 3},
+        {unitType: UnitTypes.UnitTypeEnum.MEDIUM_TANK, number: 7},
         {unitType: UnitTypes.UnitTypeEnum.EXCAVATOR,   number: 2},
     ];
     
@@ -58,6 +60,10 @@ Game.makeNewGame = function(computeProgs, mapSize, unitTypes){
 Game.update = function(game) {
     for(var i = 0; i < game.units.length; i++) {
         Unit.updateUnit(game.units[i], game);
+        if(!game.units[i].alive) {
+            game.units.splice(i, 1);
+            i--;
+        }
     }
     Bullet.update(game);
     

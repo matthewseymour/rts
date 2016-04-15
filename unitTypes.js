@@ -8,7 +8,8 @@ UnitTypes.calcuateDepth = function(position, unit, map) {
     //Factors: 
     //.25: z scaling used when the map was drawn
     //0.5: The "middle" of the z buffer
-    //position.y - size: offset the position so that the unit isn't drawn half underground.
+    //- zOffset: offset the position so that the unit isn't drawn half underground.
+    //- map.height / 2:                     
     return (0.25) * Math.sin(Math.acos(SUB_TILE_HEIGHT / SUB_TILE_WIDTH)) * (position.y - unit.type.zOffset - map.height / 2) / map.height + 0.5;
 }
 
@@ -291,6 +292,10 @@ UnitTypes.components.tankController = {
                             unit.tankState = this.tankStates.MOVE;
                         }
                     }
+                    
+                    if(!unit.target.alive) {
+                        unit.tankState = this.tankStates.MOVE;
+                    }
                     break;
                 case this.tankStates.ATTACK:
                     unit.turretState = tStates.TARGET;
@@ -304,6 +309,9 @@ UnitTypes.components.tankController = {
                         unit.moveState = mStates.MOVING;
                     } else {
                         unit.moveState = mStates.IDLE;
+                    }
+                    if(!unit.target.alive) {
+                        unit.tankState = this.tankStates.IDLE;
                     }
                     break;
             }

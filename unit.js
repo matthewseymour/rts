@@ -14,6 +14,7 @@ Unit.makeNewUnit = function(position, type, team, game) {
         mapObstacle: obstacle,
         hp: type.hitpoints,
         id: NEXT_UNIT_ID,
+        alive: true,
 
     };
     
@@ -37,6 +38,7 @@ Unit.takeDamage = function(unit, damage, attackerId) {
             unit.type.components[i].attacked(attackerId);
         }
     }
+    
 }
 
 Unit.updateUnit = function(unit, game) {
@@ -44,6 +46,14 @@ Unit.updateUnit = function(unit, game) {
         if(unit.type.components[i].update !== undefined) { 
             unit.type.components[i].update(unit, game);
         }
+    }
+    if(unit.hp <= 0) {
+        removeObstacle(game.map.obstacleStore, unit.mapObstacle);
+        
+        Particle.makeExplosion(
+            {x: unit.position.x, y: unit.position.y, z: 0}, 
+            {x: 0, y: 0, z: 0}, Particle.ExpTypes.SMALL, game.explosionStore)
+        unit.alive = false;
     }
 }
 

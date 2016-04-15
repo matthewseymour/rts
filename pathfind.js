@@ -187,8 +187,9 @@ function addObstacle(store, obs) {
 }
 
 function removeObstacle(store, obs) {
-    var index = store.getIndexOf(obs);
-    store.splice(index, 1);
+    var index = store.indexOf(obs);
+    if(index != -1) 
+        store.splice(index, 1);
 }
 
 function checkCollision(store, ignore, x1, y1, x2, y2, size) {

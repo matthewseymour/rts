@@ -4,7 +4,7 @@ const Bullet = {};
 
 //Bullet must have:
 //x, y, lastX, lastY, vx, vy, time, damage, attacker ID
-Bullet.storeWidth = 12;
+Bullet.storeWidth      = 12;
 Bullet.X               = 0;
 Bullet.Y               = 1;
 Bullet.Z               = 2;
@@ -144,18 +144,28 @@ Bullet.update = function(game) {
                 Unit.takeDamage(inRange[0], store.bullets[j + Bullet.DAMAGE], store.bullets[j + Bullet.ID]);
                 store.bullets[j + Bullet.DEAD] = 1;
                 store.bullets[j + Bullet.ALIVE_DEAD_TIME] = (k + 0.5) / steps;
+                
                 hit = true;
                 break;
             }
         }
         
-        store.bullets[j + Bullet.X] += store.bullets[j + Bullet.V_X];
-        store.bullets[j + Bullet.Y] += store.bullets[j + Bullet.V_Y];
-        
         if(!hit && store.bullets[j + Bullet.TIME] <= 1) {
             store.bullets[j + Bullet.DEAD] = 1;
             store.bullets[j + Bullet.ALIVE_DEAD_TIME] = store.bullets[j + Bullet.TIME];
         }
+        
+        if(store.bullets[j + Bullet.DEAD] == 1) {
+            Particle.makeExplosion(
+                {x: store.bullets[j + Bullet.X] + store.bullets[j + Bullet.V_X] * store.bullets[j + Bullet.ALIVE_DEAD_TIME], 
+                 y: store.bullets[j + Bullet.Y] + store.bullets[j + Bullet.V_Y] * store.bullets[j + Bullet.ALIVE_DEAD_TIME], 
+                 z: store.bullets[j + Bullet.Z]}, 
+                    {x: 0, y: 0, z: 0}, Particle.ExpTypes.SHELL, game.explosionStore);
+        }
+
+        store.bullets[j + Bullet.X] += store.bullets[j + Bullet.V_X];
+        store.bullets[j + Bullet.Y] += store.bullets[j + Bullet.V_Y];
+        
         store.bullets[j + Bullet.TIME] -= 1;
     }
 }
